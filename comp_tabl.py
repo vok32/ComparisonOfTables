@@ -1,6 +1,15 @@
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+import os
+
+def get_next_filename(output_file):
+    base_name, ext = os.path.splitext(output_file)
+    version = 1
+    while os.path.exists(output_file):
+        version += 1
+        output_file = f"{base_name}_v{version}{ext}"
+    return output_file
 
 def compare_excel_tables(file1_path, file2_path, output_path):
     # Чтение таблиц из файлов Excel
@@ -28,8 +37,12 @@ def compare_excel_tables(file1_path, file2_path, output_path):
             if comparison_values.iat[row-2, col-1]:
                 sheet.cell(row=row, column=col).fill = fill
 
+    # Генерация уникального имени файла для сохранения
+    output_path = get_next_filename(output_path)
+
     # Сохранение файла
     workbook.save(output_path)
+    print(f"Результаты сравнения сохранены в файл: {output_path}")
 
 # Пример использования
 compare_excel_tables('v1.xlsx', 'v2.xlsx', 'differences.xlsx')
