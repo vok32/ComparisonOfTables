@@ -20,10 +20,6 @@ def compare_excel_tables(file1_path, file2_path, output_path):
     if list(table1.columns) != list(table2.columns):
         raise ValueError("Таблицы должны иметь одинаковые столбцы для сравнения.")
 
-    # Сравнение таблиц и создание маски различий
-    comparison_values = table1 != table2
-    rows, cols = comparison_values.shape
-
     # Загрузка второго файла для модификации
     workbook = load_workbook(file2_path)
     sheet = workbook.active
@@ -31,11 +27,26 @@ def compare_excel_tables(file1_path, file2_path, output_path):
     # Цвет заливки для выделения различий
     fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
-    # Обход всех ячеек и выделение различий
-    for row in range(2, rows + 2):  # Начинаем с 2, так как первая строка - заголовок
-        for col in range(1, cols + 1):
-            if comparison_values.iat[row-2, col-1]:
-                sheet.cell(row=row, column=col).fill = fill
+    # Обход всех строк второй таблицы и сравнение с каждой строкой первой таблицы
+    rows1, cols1 = table1.shape
+    rows2, cols2 = table2.shape
+
+    for row2 in range(rows2):
+        matched = False
+        for row1 in range(rows1):
+            equal = True
+            for col in range(cols1):  # Предполагаем, что cols1 == cols2
+                if table1.iat[row1, col] != table2.iat[row2, col]:
+                    equal = False
+                    break
+            if equal:
+                matched = True
+                break
+        
+        # Если строка из table2 не совпала ни с одной строкой из table1, выделяем её
+        if not matched:
+            for col in range(cols2):
+                sheet.cell(row=row2 + 2, column=col + 1).fill = fill
 
     # Генерация уникального имени файла для сохранения
     output_path = get_next_filename(output_path)
