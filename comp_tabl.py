@@ -1,5 +1,5 @@
 import pandas as pd
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
 import os
 
@@ -11,7 +11,7 @@ def get_next_filename(output_file):
         output_file = f"{base_name}_v{version}{ext}"
     return output_file
 
-def compare_excel_tables(file1_path, file2_path, output_path):
+def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows):
     # Чтение таблиц из файлов Excel
     table1 = pd.read_excel(file1_path)
     table2 = pd.read_excel(file2_path)
@@ -36,9 +36,10 @@ def compare_excel_tables(file1_path, file2_path, output_path):
     if key_column not in table1.columns:
         raise ValueError("Указанный столбец отсутствует в таблицах.")
 
-    # Загрузка второго файла для модификации
-    workbook = load_workbook(file2_path)
-    sheet = workbook.active
+    # Создаем новый файл для сохранения результатов
+    new_workbook = Workbook()
+    new_sheet = new_workbook.active
+    new_sheet.append(list(table2.columns))
 
     # Цвет заливки для выделения различий
     fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
@@ -58,22 +59,33 @@ def compare_excel_tables(file1_path, file2_path, output_path):
             for col_name in table2.columns:
                 if col_name in table1_row and row[col_name] != table1_row[col_name]:
                     differences = True
-                    sheet.cell(row=index + 2, column=table2.columns.get_loc(col_name) + 1).fill = fill_green
+                    new_sheet.cell(row=index + 2, column=table2.columns.get_loc(col_name) + 1).fill = fill_green
             if differences:
                 for col_index in range(len(row)):
-                    if sheet.cell(row=index + 2, column=col_index + 1).fill != fill_green:
-                        sheet.cell(row=index + 2, column=col_index + 1).fill = fill_light_green
+                    new_sheet.cell(row=index + 2, column=col_index + 1, value=row[col_index])
+                    if new_sheet.cell(row=index + 2, column=col_index + 1).fill != fill_green:
+                        new_sheet.cell(row=index + 2, column=col_index + 1).fill = fill_light_green
         else:
             # Строка с таким ключевым значением отсутствует в table1, выделяем всю строку
             for col_index in range(len(row)):
-                sheet.cell(row=index + 2, column=col_index + 1).fill = fill_yellow
+                new_sheet.cell(row=index + 2, column=col_index + 1, value=row[col_index])
+                new_sheet.cell(row=index + 2, column=col_index + 1).fill = fill_yellow
+
+    if save_all_rows:
+        for index, row in table2.iterrows():
+            for col_index in range(len(row)):
+                cell = new_sheet.cell(row=index + 2, column=col_index + 1)
+                if cell.value is None:
+                    cell.value = row[col_index]
 
     # Генерация уникального имени файла для сохранения
     output_path = get_next_filename(output_path)
 
     # Сохранение файла
-    workbook.save(output_path)
+    new_workbook.save(output_path)
     print(f"Результаты сравнения сохранены в файл: {output_path}")
 
 # Пример использования
-compare_excel_tables('v1.xlsx', 'v2.xlsx', 'differences.xlsx')
+print("Сохранить все строки или только новые и измененные? (все/только измененные)")
+save_all = input().strip().lower() == "все"
+compare_excel_tables('v1.xlsx', 'v2.xlsx', 'differences.xlsx', save_all)
