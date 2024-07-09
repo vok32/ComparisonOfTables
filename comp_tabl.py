@@ -43,6 +43,7 @@ def compare_excel_tables(file1_path, file2_path, output_path):
     # Цвет заливки для выделения различий
     fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
     fill_light_green = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
+    fill_green = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
 
     # Создаем словарь для быстрого поиска строк в table1 по значению ключевого столбца
     table1_dict = table1.set_index(key_column).T.to_dict()
@@ -57,9 +58,11 @@ def compare_excel_tables(file1_path, file2_path, output_path):
             for col_name in table2.columns:
                 if col_name in table1_row and row[col_name] != table1_row[col_name]:
                     differences = True
-                    sheet.cell(row=index + 2, column=table2.columns.get_loc(col_name) + 1).fill = fill_light_green
-            if not differences:
-                continue
+                    sheet.cell(row=index + 2, column=table2.columns.get_loc(col_name) + 1).fill = fill_green
+            if differences:
+                for col_index in range(len(row)):
+                    if sheet.cell(row=index + 2, column=col_index + 1).fill != fill_green:
+                        sheet.cell(row=index + 2, column=col_index + 1).fill = fill_light_green
         else:
             # Строка с таким ключевым значением отсутствует в table1, выделяем всю строку
             for col_index in range(len(row)):
