@@ -18,37 +18,52 @@ def compare_excel_tables(file1_path, file2_path, output_path):
 
     # Проверка наличия одинаковых столбцов
     if list(table1.columns) != list(table2.columns):
-        raise ValueError("Таблицы должны иметь одинаковые столбцы для сравнения.")
+        print("Таблицы имеют разные столбцы.")
+        print("Столбцы файла 1:", list(table1.columns))
+        print("Столбцы файла 2:", list(table2.columns))
+        proceed = input("Продолжить сравнение, исключив несовпадающие столбцы? (да/нет): ").strip().lower()
+        if proceed != 'да':
+            raise ValueError("Сравнение прервано пользователем.")
+        else:
+            common_columns = list(set(table1.columns) & set(table2.columns))
+            table1 = table1[common_columns]
+            table2 = table2[common_columns]
+            print("Будут сравниваться только общие столбцы:", common_columns)
+
+    # Спрашиваем у пользователя, по какому столбцу проводить сверку
+    print("Доступные столбцы для сверки:", list(table1.columns))
+    key_column = input("Введите название столбца для сверки: ").strip()
+    if key_column not in table1.columns:
+        raise ValueError("Указанный столбец отсутствует в таблицах.")
 
     # Загрузка второго файла для модификации
     workbook = load_workbook(file2_path)
     sheet = workbook.active
 
     # Цвет заливки для выделения различий
-    fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    fill_light_green = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
 
-    # Обход всех строк второй таблицы и сравнение с каждой строкой первой таблицы
-    rows1, cols1 = table1.shape
-    rows2, cols2 = table2.shape
+    # Создаем словарь для быстрого поиска строк в table1 по значению ключевого столбца
+    table1_dict = table1.set_index(key_column).T.to_dict()
 
-    for row2 in range(rows2):
-        matched = False
-        for row1 in range(rows1):
-            equal = True
-            for col in range(cols1):  # Предполагаем, что cols1 == cols2
-                if table1.iat[row1, col] != table2.iat[row2, col]:
-                    equal = False
-                    break
-            if equal:
-                matched = True
-                break
-        
-        # Если строка из table2 не совпала ни с одной строкой из table1
-        if not matched:
-            for col in range(cols2):
-                if table1.iat[row1, col] != table2.iat[row2, col]:
-                    sheet.cell(row=row2 + 2, column=col + 1).fill = fill
-                    break  # Выходим из цикла по столбцам после первого найденного отличия
+    # Обход всех строк второй таблицы и сравнение с соответствующими строками первой таблицы
+    for index, row in table2.iterrows():
+        key_value = row[key_column]
+        if key_value in table1_dict:
+            # Найдена строка с таким же ключевым значением, проверяем на изменения
+            table1_row = table1_dict[key_value]
+            differences = False
+            for col_name in table2.columns:
+                if col_name in table1_row and row[col_name] != table1_row[col_name]:
+                    differences = True
+                    sheet.cell(row=index + 2, column=table2.columns.get_loc(col_name) + 1).fill = fill_light_green
+            if not differences:
+                continue
+        else:
+            # Строка с таким ключевым значением отсутствует в table1, выделяем всю строку
+            for col_index in range(len(row)):
+                sheet.cell(row=index + 2, column=col_index + 1).fill = fill_yellow
 
     # Генерация уникального имени файла для сохранения
     output_path = get_next_filename(output_path)
