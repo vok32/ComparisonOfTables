@@ -4,7 +4,6 @@ from tkinter import *
 from tkinter import filedialog, messagebox, ttk
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
-from openpyxl.utils.cell import get_column_letter
 
 def get_next_filename(output_file):
     base_name, ext = os.path.splitext(output_file)
@@ -14,7 +13,7 @@ def get_next_filename(output_file):
         output_file = f"{base_name}_v{version}{ext}"
     return output_file
 
-def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key_column):
+def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key_column, root):
     # Чтение таблиц из файлов Excel
     table1 = pd.read_excel(file1_path)
     table2 = pd.read_excel(file2_path)
@@ -31,7 +30,11 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key
     # Создаем новый файл для сохранения результатов
     new_workbook = Workbook()
     new_sheet = new_workbook.active
-    new_sheet.append(list(table2.columns))
+    new_sheet.title = "Результаты сравнения"
+
+    # Записываем заголовки столбцов в том же порядке, как в table2
+    for col_index, col_name in enumerate(table2.columns, start=1):
+        new_sheet.cell(row=1, column=col_index).value = col_name
 
     # Цвет заливки для выделения различий
     fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
@@ -48,27 +51,27 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key
             # Найдена строка с таким же ключевым значением, проверяем на изменения
             table1_row = table1_dict[key_value]
             differences = False
-            for col_name in table2.columns:
+            for col_index, col_name in enumerate(table2.columns, start=1):
                 if col_name in table1_row and row[col_name] != table1_row[col_name]:
                     differences = True
-                    new_sheet.cell(row=index + 2, column=table2.columns.get_loc(col_name) + 1).fill = fill_green
+                    new_sheet.cell(row=index + 2, column=col_index).fill = fill_green
             if differences:
-                for col_index in range(len(row)):
-                    new_sheet.cell(row=index + 2, column=col_index + 1, value=row[col_index])
-                    if new_sheet.cell(row=index + 2, column=col_index + 1).fill != fill_green:
-                        new_sheet.cell(row=index + 2, column=col_index + 1).fill = fill_light_green
+                for col_index, col_name in enumerate(table2.columns, start=1):
+                    new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
+                    if new_sheet.cell(row=index + 2, column=col_index).fill != fill_green:
+                        new_sheet.cell(row=index + 2, column=col_index).fill = fill_light_green
         else:
             # Строка с таким ключевым значением отсутствует в table1, выделяем всю строку
-            for col_index in range(len(row)):
-                new_sheet.cell(row=index + 2, column=col_index + 1, value=row[col_index])
-                new_sheet.cell(row=index + 2, column=col_index + 1).fill = fill_yellow
+            for col_index, col_name in enumerate(table2.columns, start=1):
+                new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
+                new_sheet.cell(row=index + 2, column=col_index).fill = fill_yellow
 
     if save_all_rows:
         for index, row in table2.iterrows():
-            for col_index in range(len(row)):
-                cell = new_sheet.cell(row=index + 2, column=col_index + 1)
+            for col_index, col_name in enumerate(table2.columns, start=1):
+                cell = new_sheet.cell(row=index + 2, column=col_index)
                 if cell.value is None:
-                    cell.value = row[col_index]
+                    cell.value = row[col_name]
 
     # Генерация уникального имени файла для сохранения
     output_path = get_next_filename(output_path)
@@ -77,24 +80,32 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key
     new_workbook.save(output_path)
     messagebox.showinfo("Успех", f"Результаты сравнения сохранены в файл: {output_path}")
 
+    # Открытие папки с файлом
+    def open_output_folder():
+        os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
+
+    open_folder_button = Button(root, text="Открыть папку с файлом", command=open_output_folder)
+    open_folder_button.pack(pady=10)
+
 def select_files(root):
     def select_file1():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file1_entry.delete(0, END)
-            file1_entry.insert(0, filename)
+            file1_entry.insert(0, os.path.basename(filename))  # Отображаем только имя файла
 
     def select_file2():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file2_entry.delete(0, END)
-            file2_entry.insert(0, filename)
+            file2_entry.insert(0, os.path.basename(filename))  # Отображаем только имя файла
 
     def select_output_folder():
         foldername = filedialog.askdirectory()
         if foldername:
             output_entry.delete(0, END)
-            output_entry.insert(0, foldername)
+            # Установим полный путь с расширением .xlsx
+            output_entry.insert(0, os.path.join(foldername, "differences.xlsx"))
 
     def load_columns(file_path):
         try:
@@ -139,7 +150,7 @@ def select_files(root):
                 messagebox.showerror("Ошибка", "Выберите столбец для сравнения.")
                 return
             window.destroy()
-            compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key_column)
+            compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key_column, root)
 
         button = Button(window, text="Продолжить", command=start_comparison)
         button.pack(pady=10)
