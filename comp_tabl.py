@@ -43,10 +43,12 @@ def compare_excel_tables(file1_path, file2_path, output_path):
                 matched = True
                 break
         
-        # Если строка из table2 не совпала ни с одной строкой из table1, выделяем её
+        # Если строка из table2 не совпала ни с одной строкой из table1
         if not matched:
             for col in range(cols2):
-                sheet.cell(row=row2 + 2, column=col + 1).fill = fill
+                if table1.iat[row1, col] != table2.iat[row2, col]:
+                    sheet.cell(row=row2 + 2, column=col + 1).fill = fill
+                    break  # Выходим из цикла по столбцам после первого найденного отличия
 
     # Генерация уникального имени файла для сохранения
     output_path = get_next_filename(output_path)
