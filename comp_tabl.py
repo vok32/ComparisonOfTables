@@ -1,6 +1,7 @@
 import pandas as pd
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
+from openpyxl.utils.cell import get_column_letter
 import os
 
 def get_next_filename(output_file):
@@ -84,6 +85,28 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows):
     # Сохранение файла
     new_workbook.save(output_path)
     print(f"Результаты сравнения сохранены в файл: {output_path}")
+
+    # Удаление пустых строк
+    wb = load_workbook(output_path)
+    sheet = wb.active
+    max_row = sheet.max_row
+    max_col = sheet.max_column
+
+    rows_to_delete = []
+    for row in range(2, max_row + 1):
+        row_empty = True
+        for col in range(1, max_col + 1):
+            if sheet.cell(row=row, column=col).value:
+                row_empty = False
+                break
+        if row_empty:
+            rows_to_delete.append(row)
+
+    for row in reversed(rows_to_delete):
+        sheet.delete_rows(row)
+
+    wb.save(output_path)
+    print(f"Удалены пустые строки из файла: {output_path}")
 
 # Пример использования
 print("Сохранить все строки или только новые и измененные? (все/только измененные)")
