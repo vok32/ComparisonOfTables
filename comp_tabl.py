@@ -1,8 +1,10 @@
+import os
 import pandas as pd
+from tkinter import *
+from tkinter import filedialog, messagebox, ttk
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
 from openpyxl.utils.cell import get_column_letter
-import os
 
 def get_next_filename(output_file):
     base_name, ext = os.path.splitext(output_file)
@@ -12,30 +14,19 @@ def get_next_filename(output_file):
         output_file = f"{base_name}_v{version}{ext}"
     return output_file
 
-def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows):
+def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key_column):
     # Чтение таблиц из файлов Excel
     table1 = pd.read_excel(file1_path)
     table2 = pd.read_excel(file2_path)
 
     # Проверка наличия одинаковых столбцов
     if list(table1.columns) != list(table2.columns):
-        print("Таблицы имеют разные столбцы.")
-        print("Столбцы файла 1:", list(table1.columns))
-        print("Столбцы файла 2:", list(table2.columns))
-        proceed = input("Продолжить сравнение, исключив несовпадающие столбцы? (да/нет): ").strip().lower()
-        if proceed != 'да':
-            raise ValueError("Сравнение прервано пользователем.")
-        else:
-            common_columns = list(set(table1.columns) & set(table2.columns))
-            table1 = table1[common_columns]
-            table2 = table2[common_columns]
-            print("Будут сравниваться только общие столбцы:", common_columns)
+        messagebox.showerror("Ошибка", "Таблицы имеют разные столбцы.")
+        return
 
-    # Спрашиваем у пользователя, по какому столбцу проводить сверку
-    print("Доступные столбцы для сверки:", list(table1.columns))
-    key_column = input("Введите название столбца для сверки: ").strip()
-    if key_column not in table1.columns:
-        raise ValueError("Указанный столбец отсутствует в таблицах.")
+    common_columns = list(set(table1.columns) & set(table2.columns))
+    table1 = table1[common_columns]
+    table2 = table2[common_columns]
 
     # Создаем новый файл для сохранения результатов
     new_workbook = Workbook()
@@ -84,31 +75,130 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows):
 
     # Сохранение файла
     new_workbook.save(output_path)
-    print(f"Результаты сравнения сохранены в файл: {output_path}")
+    messagebox.showinfo("Успех", f"Результаты сравнения сохранены в файл: {output_path}")
 
-    # Удаление пустых строк
-    wb = load_workbook(output_path)
-    sheet = wb.active
-    max_row = sheet.max_row
-    max_col = sheet.max_column
+def select_files(root):
+    def select_file1():
+        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
+        if filename:
+            file1_entry.delete(0, END)
+            file1_entry.insert(0, filename)
 
-    rows_to_delete = []
-    for row in range(2, max_row + 1):
-        row_empty = True
-        for col in range(1, max_col + 1):
-            if sheet.cell(row=row, column=col).value:
-                row_empty = False
-                break
-        if row_empty:
-            rows_to_delete.append(row)
+    def select_file2():
+        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
+        if filename:
+            file2_entry.delete(0, END)
+            file2_entry.insert(0, filename)
 
-    for row in reversed(rows_to_delete):
-        sheet.delete_rows(row)
+    def select_output_folder():
+        foldername = filedialog.askdirectory()
+        if foldername:
+            output_entry.delete(0, END)
+            output_entry.insert(0, foldername)
 
-    wb.save(output_path)
-    print(f"Удалены пустые строки из файла: {output_path}")
+    def load_columns(file_path):
+        try:
+            df = pd.read_excel(file_path)
+            return list(df.columns)
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось загрузить столбцы из файла: {file_path}\nОшибка: {str(e)}")
+            return []
 
-# Пример использования
-print("Сохранить все строки или только новые и измененные? (все/только измененные)")
-save_all = input().strip().lower() == "все"
-compare_excel_tables('v1.xlsx', 'v2.xlsx', 'differences.xlsx', save_all)
+    def update_columns_list(event=None):
+        file_path = file1_entry.get()
+        if not file_path:
+            return
+        columns = load_columns(file_path)
+        key_column_combo['values'] = columns
+
+    def show_columns_selection():
+        file1_path = file1_entry.get()
+        file2_path = file2_entry.get()
+        output_path = output_entry.get()
+        save_all_rows = save_option.get() == "Все строки"
+
+        if not file1_path or not file2_path or not output_path:
+            messagebox.showerror("Ошибка", "Не все поля были заполнены.")
+            return
+
+        window = Toplevel(root)
+        window.title("Выберите столбец для сравнения")
+        window.geometry("400x200")
+
+        label = Label(window, text="Выберите столбец для сравнения:")
+        label.pack(pady=10)
+
+        key_column_var = StringVar(window)
+        columns = load_columns(file1_path)
+        key_column_combo = ttk.Combobox(window, width=30, textvariable=key_column_var, values=columns)
+        key_column_combo.pack(pady=10)
+
+        def start_comparison():
+            key_column = key_column_var.get().strip()
+            if not key_column:
+                messagebox.showerror("Ошибка", "Выберите столбец для сравнения.")
+                return
+            window.destroy()
+            compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key_column)
+
+        button = Button(window, text="Продолжить", command=start_comparison)
+        button.pack(pady=10)
+
+    frame = Frame(root, padx=10, pady=10)
+    frame.pack(padx=10, pady=10)
+
+    file1_label = Label(frame, text="Выберите первый файл:")
+    file1_label.grid(row=0, column=0, sticky=W)
+
+    file1_entry = Entry(frame, width=50)
+    file1_entry.grid(row=0, column=1, padx=5, pady=5)
+
+    file1_button = Button(frame, text="Выбрать файл", command=select_file1)
+    file1_button.grid(row=0, column=2, padx=5, pady=5)
+
+    file2_label = Label(frame, text="Выберите второй файл:")
+    file2_label.grid(row=1, column=0, sticky=W)
+
+    file2_entry = Entry(frame, width=50)
+    file2_entry.grid(row=1, column=1, padx=5, pady=5)
+
+    file2_button = Button(frame, text="Выбрать файл", command=select_file2)
+    file2_button.grid(row=1, column=2, padx=5, pady=5)
+
+    output_label = Label(frame, text="Выберите папку для сохранения:")
+    output_label.grid(row=2, column=0, sticky=W)
+
+    output_entry = Entry(frame, width=50)
+    output_entry.grid(row=2, column=1, padx=5, pady=5)
+
+    output_button = Button(frame, text="Выбрать папку", command=select_output_folder)
+    output_button.grid(row=2, column=2, padx=5, pady=5)
+
+    save_label = Label(frame, text="Что сохранить в файле:")
+    save_label.grid(row=3, column=0, sticky=W)
+
+    save_option = StringVar()
+    save_option.set("Только измененные строки")
+
+    save_radio1 = Radiobutton(frame, text="Только измененные строки", variable=save_option, value="Только измененные строки")
+    save_radio1.grid(row=3, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+
+    save_radio2 = Radiobutton(frame, text="Все строки", variable=save_option, value="Все строки")
+    save_radio2.grid(row=4, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+
+    start_button = Button(frame, text="Далее", command=show_columns_selection)
+    start_button.grid(row=5, column=1, columnspan=2, padx=5, pady=10)
+
+    root.mainloop()
+
+# Основная часть программы
+if __name__ == "__main__":
+    # Создание главного окна
+    root = Tk()
+    root.title("Сравнение таблиц Excel")
+
+    # Вызов функции для отображения GUI
+    select_files(root)
+
+    # Запуск главного цикла обработки событий
+    root.mainloop()
