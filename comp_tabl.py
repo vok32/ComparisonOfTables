@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from tkinter import *
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, simpledialog  
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
 
@@ -192,7 +192,7 @@ def select_files(root):
             window.destroy()
             compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root, position)
 
-        button = Button(window, text="Продолжить", command=start_comparison)
+        button = Button(window, text="Начать сравнение", command=start_comparison)
         button.pack(pady=10)
 
     frame = Frame(root, padx=10, pady=10)
@@ -231,22 +231,32 @@ def select_files(root):
     output_button = Button(frame, text="Выбрать папку", command=select_output_folder)
     output_button.grid(row=2, column=2, padx=5, pady=5)
 
+    def update_filename():
+        filename = simpledialog.askstring("Введите имя файла", "Имя файла:", parent=root)
+        if filename:
+            folder_path = os.path.dirname(output_entry.get())
+            output_entry.delete(0, END)
+            output_entry.insert(0, os.path.join(folder_path, f"{filename}.xlsx"))
+
+    filename_button = Button(frame, text="Изменить имя файла", command=update_filename)
+    filename_button.grid(row=3, column=2, padx=5, pady=5)
+
     save_label = Label(frame, text="Что сохранить в файле:")
-    save_label.grid(row=3, column=0, sticky=W)
+    save_label.grid(row=4, column=0, sticky=W)
 
     save_option_var = StringVar(value="Все строки")
 
     save_radio1 = Radiobutton(frame, text="Все строки", variable=save_option_var, value="Все строки")
-    save_radio1.grid(row=3, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+    save_radio1.grid(row=4, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
     save_radio2 = Radiobutton(frame, text="Только новые строки", variable=save_option_var, value="Только новые строки")
-    save_radio2.grid(row=4, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+    save_radio2.grid(row=5, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
     save_radio3 = Radiobutton(frame, text="Только измененные строки", variable=save_option_var, value="Только измененные строки")
-    save_radio3.grid(row=5, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+    save_radio3.grid(row=6, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
     save_radio4 = Radiobutton(frame, text="Новые+измененные строки", variable=save_option_var, value="Новые/измененные строки")
-    save_radio4.grid(row=6, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+    save_radio4.grid(row=7, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
     start_button = Button(root, text="Далее", command=show_columns_selection, width=20)
     start_button.pack(pady=10, padx=10)
@@ -255,7 +265,7 @@ def select_files(root):
     developer_button.pack(pady=10, padx=10)
 
     save_label = Label(frame, text="© 3МН")
-    save_label.grid(row=7, column=2, sticky=E, pady=10)
+    save_label.grid(row=8, column=2, sticky=E, pady=10)
 
 # О разработчике
 def show_developer_info(root, position):
@@ -286,11 +296,11 @@ def show_developer_info(root, position):
 def main():
     root = Tk()
     root.title("Сравнение таблиц Excel")
-    root.geometry("700x425")
+    root.geometry("700x475")
 
     # Открытие окна по центру экрана
     window_width = 700
-    window_height = 425
+    window_height = 475
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     position_top = int(screen_height / 2 - window_height / 2)
