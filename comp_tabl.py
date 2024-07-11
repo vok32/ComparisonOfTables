@@ -97,7 +97,12 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
 def show_success_window(output_path, root, position):
     success_window = Toplevel(root)
     success_window.title("Успех")
-    success_window.geometry(f"400x150+{position[0]}+{position[1]}")
+    
+    # Центрирование окна "Успех" относительно главного окна
+    root.update_idletasks()
+    root_position_x = root.winfo_x()
+    root_position_y = root.winfo_y()
+    success_window.geometry(f"400x150+{root_position_x}+{root_position_y}")
     
     label = Label(success_window, text=f"Результаты сравнения сохранены в файл:\n{output_path}")
     label.pack(pady=10)
@@ -112,6 +117,8 @@ def open_output_folder(output_path):
     os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
 
 def select_files(root):
+    position = [root.winfo_x(), root.winfo_y()]  # Получаем позицию главного окна
+
     def select_file1():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
@@ -163,7 +170,7 @@ def select_files(root):
             messagebox.showerror("Ошибка", "Не все поля были заполнены.")
             return
 
-        position = [root.winfo_x(), root.winfo_y()]
+        position = [root.winfo_x(), root.winfo_y()]  # Получаем позицию главного окна
 
         window = Toplevel(root)
         window.title("Выберите столбец для сравнения")
@@ -238,25 +245,39 @@ def select_files(root):
     save_radio3 = Radiobutton(frame, text="Только измененные строки", variable=save_option_var, value="Только измененные строки")
     save_radio3.grid(row=5, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
-    save_radio4 = Radiobutton(frame, text="Новые/измененные строки", variable=save_option_var, value="Новые/измененные строки")
+    save_radio4 = Radiobutton(frame, text="Новые+измененные строки", variable=save_option_var, value="Новые/измененные строки")
     save_radio4.grid(row=6, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
     start_button = Button(root, text="Далее", command=show_columns_selection, width=20)
     start_button.pack(pady=10, padx=10)
 
-    developer_button = Button(root, text="О разработчике", command=show_developer_info, width=20)
+    developer_button = Button(root, text="О разработчике", command=lambda: show_developer_info(root, position), width=20)
     developer_button.pack(pady=10, padx=10)
 
+    save_label = Label(frame, text="© 3МН")
+    save_label.grid(row=7, column=2, sticky=E, pady=10)
+
 # О разработчике
-def show_developer_info():
-    developer_window = Toplevel()
+def show_developer_info(root, position):
+    developer_window = Toplevel(root)
     developer_window.title("О разработчике")
-    developer_window.geometry("400x150")
+    
+    # Центрирование окна "О разработчике" относительно главного окна
+    root.update_idletasks()
+    root_position_x = root.winfo_x()
+    root_position_y = root.winfo_y()
+    developer_window.geometry(f"500x120+{root_position_x}+{root_position_y}")
     
     label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
     label.pack()
 
-    label = Label(developer_window, text="Разработчик - https://github.com/vok32", padx=10, pady=5)
+    label = Label(developer_window, text="Программа создана сотрудником 3 меганаправления, студентом 305 кафедры", padx=10, pady=5)
+    label.pack()
+
+    label = Label(developer_window, text="и просто хорошим мальчиком - Матюшенко Романом", padx=10, pady=5)
+    label.pack()
+
+    label = Label(developer_window, text="Ссылка на GitHub - https://github.com/vok32", padx=10, pady=5)
     label.pack()
 
     back_button = Button(developer_window, text="Назад", command=developer_window.destroy)
@@ -265,11 +286,11 @@ def show_developer_info():
 def main():
     root = Tk()
     root.title("Сравнение таблиц Excel")
-    root.geometry("700x400")
+    root.geometry("700x425")
 
     # Открытие окна по центру экрана
     window_width = 700
-    window_height = 400
+    window_height = 425
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     position_top = int(screen_height / 2 - window_height / 2)
