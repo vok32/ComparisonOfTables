@@ -86,12 +86,23 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
 
     # Сохранение файла
     new_workbook.save(output_path)
-    messagebox.showinfo("Успех", f"Результаты сравнения сохранены в файл: {output_path}")
+    
+    # Отображение окна с сообщением об успешном сохранении
+    show_success_window(output_path, root)
 
-    # Открытие папки с файлом
-    if not hasattr(root, 'open_folder_button'):
-        root.open_folder_button = Button(root, text="Открыть папку с файлом", command=lambda: open_output_folder(output_path))
-        root.open_folder_button.pack(pady=10)
+def show_success_window(output_path, root):
+    success_window = Toplevel(root)
+    success_window.title("Успех")
+    success_window.geometry("400x150")
+    
+    label = Label(success_window, text=f"Результаты сравнения сохранены в файл:\n{output_path}")
+    label.pack(pady=10)
+    
+    open_folder_button = Button(success_window, text="Открыть папку с файлом", command=lambda: open_output_folder(output_path))
+    open_folder_button.pack(pady=5)
+    
+    close_button = Button(success_window, text="Готово", command=success_window.destroy)
+    close_button.pack(pady=5)
 
 def open_output_folder(output_path):
     os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
