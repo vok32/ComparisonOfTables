@@ -5,10 +5,6 @@ from tkinter import filedialog, messagebox, ttk
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
 
-# Глобальная переменная для хранения последней позиции окна
-last_window_position = None
-
-# Функция для генерации уникального имени файла
 def get_next_filename(output_file):
     base_name, ext = os.path.splitext(output_file)
     version = 1
@@ -17,7 +13,6 @@ def get_next_filename(output_file):
         output_file = f"{base_name}_v{version}{ext}"
     return output_file
 
-# Функция для удаления пустых строк
 def remove_empty_rows(sheet):
     rows_to_delete = []
     for row in sheet.iter_rows(min_row=2, max_col=sheet.max_column, values_only=False):
@@ -26,19 +21,17 @@ def remove_empty_rows(sheet):
     for row_num in reversed(rows_to_delete):
         sheet.delete_rows(row_num)
 
-# Функция для сравнения таблиц Excel
-def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root):
+def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root, position):
     # Чтение таблиц из файлов Excel
     table1 = pd.read_excel(file1_path)
     table2 = pd.read_excel(file2_path)
 
     # Проверка наличия одинаковых столбцов
     if list(table1.columns) != list(table2.columns):
-        user_choice = messagebox.askyesno("Разные столбцы", "Таблицы имеют разные столбцы. Игнорировать лишние столбцы?")
+        user_choice = messagebox.askyesno("Ошибка", "Таблицы имеют разные столбцы. Игнорировать столбцы с несовпадающими именами?")
         if not user_choice:
             return
-        # Приведение столбцов к общему виду (оставляем только общие столбцы)
-        common_columns = table1.columns.intersection(table2.columns)
+        common_columns = list(set(table1.columns).intersection(set(table2.columns)))
         table1 = table1[common_columns]
         table2 = table2[common_columns]
 
@@ -99,14 +92,13 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     new_workbook.save(output_path)
     
     # Отображение окна с сообщением об успешном сохранении
-    show_success_window(output_path, root)
+    show_success_window(output_path, root, position)
 
-# Функция для отображения окна с успешным результатом
-def show_success_window(output_path, root):
+def show_success_window(output_path, root, position):
     success_window = Toplevel(root)
     success_window.title("Успех")
-    success_window.geometry(f"400x150+{last_window_position[0]}+{last_window_position[1]}")  # Открытие окна в последней позиции
-
+    success_window.geometry(f"400x150+{position[0]}+{position[1]}")
+    
     label = Label(success_window, text=f"Результаты сравнения сохранены в файл:\n{output_path}")
     label.pack(pady=10)
     
@@ -116,39 +108,27 @@ def show_success_window(output_path, root):
     close_button = Button(success_window, text="Готово", command=success_window.destroy)
     close_button.pack(pady=5)
 
-# Функция для открытия папки с файлом
 def open_output_folder(output_path):
     os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
 
-# Функция для выбора файлов и папки
 def select_files(root):
-    global last_window_position
-
-    def on_move(event):
-        global last_window_position
-        last_window_position = (root.winfo_x(), root.winfo_y())
-
-    root.bind('<Configure>', on_move)
-    
-    # Выбор первого файла
     def select_file1():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file1_entry.delete(0, END)
-            file1_entry.insert(0, filename)
+            file1_entry.insert(0, filename)  # Сохраняем полный путь
 
-    # Выбор второго файла
     def select_file2():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file2_entry.delete(0, END)
-            file2_entry.insert(0, filename)
+            file2_entry.insert(0, filename)  # Сохраняем полный путь
 
-    # Выбор папки для сохранения файла
     def select_output_folder():
         foldername = filedialog.askdirectory()
         if foldername:
             output_entry.delete(0, END)
+            # Установим полный путь с расширением .xlsx
             output_entry.insert(0, os.path.join(foldername, "differences.xlsx"))
         else:
             output_entry.delete(0, END)
@@ -158,7 +138,6 @@ def select_files(root):
                 os.makedirs(comparison_folder)
             output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
 
-    # Загрузка столбцов из файла
     def load_columns(file_path):
         try:
             df = pd.read_excel(file_path)
@@ -167,7 +146,6 @@ def select_files(root):
             messagebox.showerror("Ошибка", f"Не удалось загрузить столбцы из файла: {file_path}\nОшибка: {str(e)}")
             return []
 
-    # Обновление списка столбцов
     def update_columns_list(event=None):
         file_path = file1_entry.get()
         if not file_path:
@@ -175,7 +153,6 @@ def select_files(root):
         columns = load_columns(file_path)
         key_column_combo['values'] = columns
 
-    # Показ окна выбора столбца для сравнения
     def show_columns_selection():
         file1_path = file1_entry.get()
         file2_path = file2_entry.get()
@@ -186,33 +163,33 @@ def select_files(root):
             messagebox.showerror("Ошибка", "Не все поля были заполнены.")
             return
 
+        position = [root.winfo_x(), root.winfo_y()]
+
         window = Toplevel(root)
         window.title("Выберите столбец для сравнения")
-        window.geometry(f"400x200+{last_window_position[0]}+{last_window_position[1]}")  # Открытие окна в последней позиции
+        window.geometry(f"400x200+{position[0]}+{position[1]}")
 
         label = Label(window, text="Выберите столбец для сравнения:")
         label.pack(pady=10)
 
         key_column_var = StringVar(window)
         columns = load_columns(file1_path)
-        key_column_combo = ttk.Combobox(window, width=40, textvariable=key_column_var, values=columns)
+        key_column_combo = ttk.Combobox(window, width=30, textvariable=key_column_var, values=columns)
         key_column_combo.pack(pady=10)
-        key_column_combo.bind("<Button-1>", update_columns_list)
 
         def start_comparison():
-            key_column = key_column_combo.get()
+            key_column = key_column_var.get().strip()
             if not key_column:
-                messagebox.showerror("Ошибка", "Не выбран столбец для сравнения.")
+                messagebox.showerror("Ошибка", "Выберите столбец для сравнения.")
                 return
             window.destroy()
-            compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root)
+            compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root, position)
 
-        start_button = Button(window, text="Начать сравнение", command=start_comparison)
-        start_button.pack(pady=10)
+        button = Button(window, text="Продолжить", command=start_comparison)
+        button.pack(pady=10)
 
-    # Создание фрейма для выбора файлов
-    frame = Frame(root)
-    frame.pack(pady=20, padx=20)
+    frame = Frame(root, padx=10, pady=10)
+    frame.pack(padx=10, pady=10)
 
     file1_label = Label(frame, text="Выберите первый файл:")
     file1_label.grid(row=0, column=0, sticky=W)
@@ -270,33 +247,37 @@ def select_files(root):
     developer_button = Button(root, text="О разработчике", command=show_developer_info, width=20)
     developer_button.pack(pady=10, padx=10)
 
-# Функция для отображения окна с информацией о разработчике
+# О разработчике
 def show_developer_info():
-    developer_window = Toplevel(root)
+    developer_window = Toplevel()
     developer_window.title("О разработчике")
-    developer_window.geometry(f"400x150+{last_window_position[0]}+{last_window_position[1]}")  # Открытие окна в последней позиции
+    developer_window.geometry("400x150")
+    
+    label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
+    label.pack()
 
-    developer_label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
-    developer_label.pack()
-
-    developer_label = Label(developer_window, text="Разработчик - https://github.com/vok32", padx=10, pady=5)
-    developer_label.pack()
+    label = Label(developer_window, text="Разработчик - https://github.com/vok32", padx=10, pady=5)
+    label.pack()
 
     back_button = Button(developer_window, text="Назад", command=developer_window.destroy)
     back_button.pack()
 
-# Главная функция
 def main():
-    global root
-    global last_window_position
-
     root = Tk()
     root.title("Сравнение таблиц Excel")
-    root.geometry("700x400+300+300")  # Открытие окна в центре экрана
-    last_window_position = (300, 300)
+    root.geometry("700x400")
+
+    # Открытие окна по центру экрана
+    window_width = 700
+    window_height = 400
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    position_top = int(screen_height / 2 - window_height / 2)
+    position_right = int(screen_width / 2 - window_width / 2)
+    root.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
+    
     select_files(root)
     root.mainloop()
 
-# Вызов функции
 if __name__ == "__main__":
     main()
