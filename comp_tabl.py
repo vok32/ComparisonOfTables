@@ -20,7 +20,7 @@ def remove_empty_rows(sheet):
             rows_to_delete.append(row[0].row)
     for row_num in reversed(rows_to_delete):
         sheet.delete_rows(row_num)
-        
+
 def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root):
     # Чтение таблиц из файлов Excel
     table1 = pd.read_excel(file1_path)
@@ -89,11 +89,12 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     messagebox.showinfo("Успех", f"Результаты сравнения сохранены в файл: {output_path}")
 
     # Открытие папки с файлом
-    def open_output_folder():
-        os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
+    if not hasattr(root, 'open_folder_button'):
+        root.open_folder_button = Button(root, text="Открыть папку с файлом", command=lambda: open_output_folder(output_path))
+        root.open_folder_button.pack(pady=10)
 
-    open_folder_button = Button(root, text="Открыть папку с файлом", command=open_output_folder)
-    open_folder_button.pack(pady=10)
+def open_output_folder(output_path):
+    os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
 
 def select_files(root):
     def select_file1():
@@ -114,6 +115,13 @@ def select_files(root):
             output_entry.delete(0, END)
             # Установим полный путь с расширением .xlsx
             output_entry.insert(0, os.path.join(foldername, "differences.xlsx"))
+        else:
+            output_entry.delete(0, END)
+            desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+            comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+            if not os.path.exists(comparison_folder):
+                os.makedirs(comparison_folder)
+            output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
 
     def load_columns(file_path):
         try:
@@ -189,6 +197,13 @@ def select_files(root):
 
     output_entry = Entry(frame, width=50)
     output_entry.grid(row=2, column=1, padx=5, pady=5)
+    
+    # Set default output folder
+    desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
+    comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+    if not os.path.exists(comparison_folder):
+        os.makedirs(comparison_folder)
+    output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
 
     output_button = Button(frame, text="Выбрать папку", command=select_output_folder)
     output_button.grid(row=2, column=2, padx=5, pady=5)
@@ -196,8 +211,7 @@ def select_files(root):
     save_label = Label(frame, text="Что сохранить в файле:")
     save_label.grid(row=3, column=0, sticky=W)
 
-    save_option_var = StringVar()
-    save_option_var.set("Все строки")
+    save_option_var = StringVar(value="Все строки")
 
     save_radio1 = Radiobutton(frame, text="Все строки", variable=save_option_var, value="Все строки")
     save_radio1.grid(row=3, column=1, columnspan=2, padx=5, pady=5, sticky=W)
@@ -214,16 +228,12 @@ def select_files(root):
     start_button = Button(frame, text="Далее", command=show_columns_selection)
     start_button.grid(row=7, column=1, columnspan=2, padx=5, pady=10)
 
-    root.mainloop()
-
-# Основная часть программы
-if __name__ == "__main__":
-    # Создание главного окна
+def main():
     root = Tk()
     root.title("Сравнение таблиц Excel")
-
-    # Вызов функции для отображения GUI
+    root.geometry("700x350")
     select_files(root)
-
-    # Запуск главного цикла обработки событий
     root.mainloop()
+
+if __name__ == "__main__":
+    main()
