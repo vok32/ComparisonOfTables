@@ -239,10 +239,27 @@ def select_files(root):
     start_button = Button(frame, text="Далее", command=show_columns_selection)
     start_button.grid(row=7, column=1, columnspan=2, padx=5, pady=10)
 
+    developer_button = Button(frame, text="О разработчике", command=show_developer_info)
+    developer_button.grid(row=8, column=1, columnspan=2, padx=5, pady=10)
+
+# О разработчике
+def show_developer_info():
+    developer_window = Tk()
+    developer_window.title("О разработчике")
+    developer_label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
+    developer_label.pack()
+    developer_label = Label(developer_window, text="Разработчик - https://github.com/vok32", padx=10, pady=5)
+    developer_label.pack()
+
+    back_button = Button(developer_window, text="Назад", command=developer_window.destroy)
+    back_button.pack()
+
+    developer_window.mainloop()
+
 def main():
     root = Tk()
     root.title("Сравнение таблиц Excel")
-    root.geometry("700x350")
+    root.geometry("700x400")
     select_files(root)
     root.mainloop()
 
