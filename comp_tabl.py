@@ -13,6 +13,14 @@ def get_next_filename(output_file):
         output_file = f"{base_name}_v{version}{ext}"
     return output_file
 
+def remove_empty_rows(sheet):
+    rows_to_delete = []
+    for row in sheet.iter_rows(min_row=2, max_col=sheet.max_column, values_only=False):
+        if all(cell.value is None for cell in row):
+            rows_to_delete.append(row[0].row)
+    for row_num in reversed(rows_to_delete):
+        sheet.delete_rows(row_num)
+        
 def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root):
     # Чтение таблиц из файлов Excel
     table1 = pd.read_excel(file1_path)
@@ -69,6 +77,9 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
                 cell = new_sheet.cell(row=index + 2, column=col_index)
                 if cell.value is None:
                     cell.value = row[col_name]
+
+    # Удаление пустых строк
+    remove_empty_rows(new_sheet)
 
     # Генерация уникального имени файла для сохранения
     output_path = get_next_filename(output_path)
@@ -186,7 +197,7 @@ def select_files(root):
     save_label.grid(row=3, column=0, sticky=W)
 
     save_option_var = StringVar()
-    save_option_var.set("Только измененные строки")
+    save_option_var.set("Все строки")
 
     save_radio1 = Radiobutton(frame, text="Все строки", variable=save_option_var, value="Все строки")
     save_radio1.grid(row=3, column=1, columnspan=2, padx=5, pady=5, sticky=W)
