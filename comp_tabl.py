@@ -13,7 +13,7 @@ def get_next_filename(output_file):
         output_file = f"{base_name}_v{version}{ext}"
     return output_file
 
-def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key_column, root):
+def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root):
     # Чтение таблиц из файлов Excel
     table1 = pd.read_excel(file1_path)
     table2 = pd.read_excel(file2_path)
@@ -51,18 +51,19 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key
                 if col_name in table1_row and row[col_name] != table1_row[col_name]:
                     differences = True
                     new_sheet.cell(row=index + 2, column=col_index).fill = fill_green
-            if differences:
+            if differences and (save_option in ["Все строки", "Только измененные строки", "Новые/измененные строки"]):
                 for col_index, col_name in enumerate(table2.columns, start=1):
                     new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
                     if new_sheet.cell(row=index + 2, column=col_index).fill != fill_green:
                         new_sheet.cell(row=index + 2, column=col_index).fill = fill_light_green
         else:
             # Строка с таким ключевым значением отсутствует в table1, выделяем всю строку
-            for col_index, col_name in enumerate(table2.columns, start=1):
-                new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
-                new_sheet.cell(row=index + 2, column=col_index).fill = fill_yellow
+            if save_option in ["Все строки", "Только новые строки", "Новые/измененные строки"]:
+                for col_index, col_name in enumerate(table2.columns, start=1):
+                    new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
+                    new_sheet.cell(row=index + 2, column=col_index).fill = fill_yellow
 
-    if save_all_rows:
+    if save_option == "Все строки":
         for index, row in table2.iterrows():
             for col_index, col_name in enumerate(table2.columns, start=1):
                 cell = new_sheet.cell(row=index + 2, column=col_index)
@@ -88,13 +89,13 @@ def select_files(root):
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file1_entry.delete(0, END)
-            file1_entry.insert(0, os.path.basename(filename))  # Отображаем только имя файла
+            file1_entry.insert(0, filename)  # Сохраняем полный путь
 
     def select_file2():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file2_entry.delete(0, END)
-            file2_entry.insert(0, os.path.basename(filename))  # Отображаем только имя файла
+            file2_entry.insert(0, filename)  # Сохраняем полный путь
 
     def select_output_folder():
         foldername = filedialog.askdirectory()
@@ -122,7 +123,7 @@ def select_files(root):
         file1_path = file1_entry.get()
         file2_path = file2_entry.get()
         output_path = output_entry.get()
-        save_all_rows = save_option.get() == "Все строки"
+        save_option = save_option_var.get()
 
         if not file1_path or not file2_path or not output_path:
             messagebox.showerror("Ошибка", "Не все поля были заполнены.")
@@ -146,7 +147,7 @@ def select_files(root):
                 messagebox.showerror("Ошибка", "Выберите столбец для сравнения.")
                 return
             window.destroy()
-            compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key_column, root)
+            compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root)
 
         button = Button(window, text="Продолжить", command=start_comparison)
         button.pack(pady=10)
@@ -184,17 +185,23 @@ def select_files(root):
     save_label = Label(frame, text="Что сохранить в файле:")
     save_label.grid(row=3, column=0, sticky=W)
 
-    save_option = StringVar()
-    save_option.set("Только измененные строки")
+    save_option_var = StringVar()
+    save_option_var.set("Только измененные строки")
 
-    save_radio1 = Radiobutton(frame, text="Только измененные строки", variable=save_option, value="Только измененные строки")
+    save_radio1 = Radiobutton(frame, text="Все строки", variable=save_option_var, value="Все строки")
     save_radio1.grid(row=3, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
-    save_radio2 = Radiobutton(frame, text="Все строки", variable=save_option, value="Все строки")
+    save_radio2 = Radiobutton(frame, text="Только новые строки", variable=save_option_var, value="Только новые строки")
     save_radio2.grid(row=4, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
+    save_radio3 = Radiobutton(frame, text="Только измененные строки", variable=save_option_var, value="Только измененные строки")
+    save_radio3.grid(row=5, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+
+    save_radio4 = Radiobutton(frame, text="Новые/измененные строки", variable=save_option_var, value="Новые/измененные строки")
+    save_radio4.grid(row=6, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+
     start_button = Button(frame, text="Далее", command=show_columns_selection)
-    start_button.grid(row=5, column=1, columnspan=2, padx=5, pady=10)
+    start_button.grid(row=7, column=1, columnspan=2, padx=5, pady=10)
 
     root.mainloop()
 
