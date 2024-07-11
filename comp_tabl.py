@@ -266,7 +266,7 @@ def show_developer_info(root, position):
     root.update_idletasks()
     root_position_x = root.winfo_x()
     root_position_y = root.winfo_y()
-    developer_window.geometry(f"500x120+{root_position_x}+{root_position_y}")
+    developer_window.geometry(f"500x150+{root_position_x}+{root_position_y}")
     
     label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
     label.pack()
