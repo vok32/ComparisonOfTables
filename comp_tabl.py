@@ -23,10 +23,6 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_all_rows, key
         messagebox.showerror("Ошибка", "Таблицы имеют разные столбцы.")
         return
 
-    common_columns = list(set(table1.columns) & set(table2.columns))
-    table1 = table1[common_columns]
-    table2 = table2[common_columns]
-
     # Создаем новый файл для сохранения результатов
     new_workbook = Workbook()
     new_sheet = new_workbook.active
