@@ -112,13 +112,13 @@ def select_files(root):
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file1_entry.delete(0, END)
-            file1_entry.insert(0, os.path.basename(filename))  # Сохраняем полный путь
+            file1_entry.insert(0, filename)  # Сохраняем полный путь
 
     def select_file2():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file2_entry.delete(0, END)
-            file2_entry.insert(0, os.path.basename(filename))  # Сохраняем полный путь
+            file2_entry.insert(0, filename)  # Сохраняем полный путь
 
     def select_output_folder():
         foldername = filedialog.askdirectory()
