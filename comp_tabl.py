@@ -112,13 +112,13 @@ def select_files(root):
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file1_entry.delete(0, END)
-            file1_entry.insert(0, filename)  # Сохраняем полный путь
+            file1_entry.insert(0, os.path.basename(filename))  # Сохраняем полный путь
 
     def select_file2():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file2_entry.delete(0, END)
-            file2_entry.insert(0, filename)  # Сохраняем полный путь
+            file2_entry.insert(0, os.path.basename(filename))  # Сохраняем полный путь
 
     def select_output_folder():
         foldername = filedialog.askdirectory()
@@ -208,8 +208,7 @@ def select_files(root):
 
     output_entry = Entry(frame, width=50)
     output_entry.grid(row=2, column=1, padx=5, pady=5)
-    
-    # Set default output folder
+
     desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
     comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
     if not os.path.exists(comparison_folder):
@@ -236,11 +235,11 @@ def select_files(root):
     save_radio4 = Radiobutton(frame, text="Новые/измененные строки", variable=save_option_var, value="Новые/измененные строки")
     save_radio4.grid(row=6, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
-    start_button = Button(frame, text="Далее", command=show_columns_selection)
-    start_button.grid(row=7, column=1, columnspan=2, padx=5, pady=10)
+    start_button = Button(root, text="Далее", command=show_columns_selection, width=20)
+    start_button.pack(pady=10, padx=10)
 
-    developer_button = Button(frame, text="О разработчике", command=show_developer_info)
-    developer_button.grid(row=8, column=1, columnspan=2, padx=5, pady=10)
+    developer_button = Button(root, text="О разработчике", command=show_developer_info, width=20)
+    developer_button.pack(pady=10, padx=10)
 
 # О разработчике
 def show_developer_info():
