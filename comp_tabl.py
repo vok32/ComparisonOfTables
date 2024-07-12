@@ -67,21 +67,6 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     fill_green = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
     fill_light_orange = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Светло-оранжевый
 
-    # Окрашиваем столбцы, которые не учтены
-    unused_columns1 = columns1 - columns2
-    unused_columns2 = columns2 - columns1
-
-    # Выделяем столбцы, отсутствующие в одной из таблиц
-    for col_name in unused_columns1:
-        col_index = table2.columns.get_loc(col_name) + 1
-        for row in range(1, len(table2) + 2):  # Включаем заголовок
-            new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
-
-    for col_name in unused_columns2:
-        col_index = table2.columns.get_loc(col_name) + 1
-        for row in range(1, len(table2) + 2):  # Включаем заголовок
-            new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
-
     # Создаем словарь для быстрого поиска строк в table1 по значению ключевого столбца
     table1_dict = table1.set_index(key_column).T.to_dict()
 
@@ -118,12 +103,26 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     # Удаление пустых строк
     remove_empty_rows(new_sheet)
 
+    # Окрашиваем неучтенные столбцы в светло-оранжевый
+    unused_columns1 = columns1 - columns2
+    unused_columns2 = columns2 - columns1
+
+    for col_name in unused_columns1:
+        col_index = table2.columns.get_loc(col_name) + 1
+        for row in range(1, len(table2) + 2):  # Включаем заголовок
+            new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
+
+    for col_name in unused_columns2:
+        col_index = table2.columns.get_loc(col_name) + 1
+        for row in range(1, len(table2) + 2):  # Включаем заголовок
+            new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
+
     # Генерация уникального имени файла для сохранения
     output_path = get_next_filename(output_path)
 
     # Сохранение файла
     new_workbook.save(output_path)
-    
+
     # Отображение окна с сообщением об успешном сохранении
     show_success_window(output_path, root, position)
 
