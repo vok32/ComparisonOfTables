@@ -21,6 +21,24 @@ def remove_empty_rows(sheet):
     for row_num in reversed(rows_to_delete):
         sheet.delete_rows(row_num)
 
+def custom_messagebox(title, message, root):
+    window = Toplevel(root)
+    window.title(title)
+
+    # Центрирование окна в левом верхнем углу приложения
+    window.geometry(f"400x125+{root.winfo_x()}+{root.winfo_y()}")  # Позиция в левом верхнем углу
+
+    label = Label(window, text=message)
+    label.pack(pady=10)
+
+    accept_button = Button(window, text="Принять", command=window.destroy)
+    accept_button.pack(pady=5)
+
+    window.transient()  # Делает окно модальным
+    window.grab_set()   # Блокирует родительское окно
+    window.focus_set()  # Устанавливает фокус на новое окно
+    window.wait_window()  # Ожидает закрытия окна
+
 def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root, position):
     # Чтение таблиц из файлов Excel
     table1 = pd.read_excel(file1_path)
@@ -28,12 +46,7 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
 
     # Проверка наличия одинаковых столбцов
     if list(table1.columns) != list(table2.columns):
-        messagebox.showinfo("Ошибка", "Таблицы имеют разные столбцы. Будут использованы только общие столбцы.")
-
-        # # Сохраняем порядок столбцов как в table2, выбирая только общие столбцы
-        # common_columns = list(set(table1.columns).intersection(set(table2.columns)))
-        # table1 = table1[common_columns]
-        # table2 = table2[common_columns]
+        custom_messagebox("Ошибка", "Таблицы имеют разные столбцы.\nБудут использованы только общие столбцы.\n\nОтсылка на кнопку отклонить в 1C.", root)
 
     # Создаем новый файл для сохранения результатов
     new_workbook = Workbook()
