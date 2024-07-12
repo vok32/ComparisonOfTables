@@ -28,47 +28,12 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
 
     # Проверка наличия одинаковых столбцов
     if list(table1.columns) != list(table2.columns):
-        user_choice = messagebox.askyesno("Ошибка", "Таблицы имеют разные столбцы. Игнорировать столбцы с несовпадающими именами?")
-        if user_choice:
-            # Сохраняем порядок столбцов как в table2, выбирая только общие столбцы
-            common_columns = list(set(table1.columns).intersection(set(table2.columns)))
-            table1 = table1[common_columns]
-            table2 = table2[common_columns]
-        else:
-            # Заполняем новую таблицу данными из обеих таблиц, сохраняя все столбцы
-            new_workbook = Workbook()
-            new_sheet = new_workbook.active
-            new_sheet.title = "Результаты сравнения"
+        messagebox.showinfo("Ошибка", "Таблицы имеют разные столбцы. Будут использованы только общие столбцы.")
 
-            # Записываем заголовки столбцов из table2
-            for col_index, col_name in enumerate(table2.columns, start=1):
-                new_sheet.cell(row=1, column=col_index).value = col_name
-
-            fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-
-            # Заполняем данными из table2, выделяя различия
-            for index, row in table2.iterrows():
-                for col_index, col_name in enumerate(table2.columns, start=1):
-                    new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
-                    if col_name not in table1.columns or row[col_name] != table1.loc[index, col_name]:
-                        new_sheet.cell(row=index + 2, column=col_index).fill = fill_yellow
-
-            # Удаление пустых строк
-            remove_empty_rows(new_sheet)
-
-            # Генерация уникального имени файла для сохранения
-            output_path = get_next_filename(output_path)
-
-            # Сохранение файла
-            new_workbook.save(output_path)
-            
-            # Отображение окна с сообщением об успешном сохранении
-            show_success_window(output_path, root, position)
-            return
-
-        common_columns = list(set(table1.columns).intersection(set(table2.columns)))
-        table1 = table1[common_columns]
-        table2 = table2[common_columns]
+        # # Сохраняем порядок столбцов как в table2, выбирая только общие столбцы
+        # common_columns = list(set(table1.columns).intersection(set(table2.columns)))
+        # table1 = table1[common_columns]
+        # table2 = table2[common_columns]
 
     # Создаем новый файл для сохранения результатов
     new_workbook = Workbook()
