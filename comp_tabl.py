@@ -44,8 +44,12 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     table1 = pd.read_excel(file1_path)
     table2 = pd.read_excel(file2_path)
 
+    # Получаем имена столбцов
+    columns1 = set(table1.columns)
+    columns2 = set(table2.columns)
+
     # Проверка наличия одинаковых столбцов
-    if list(table1.columns) != list(table2.columns):
+    if columns1 != columns2:
         custom_messagebox("Ошибка", "Таблицы имеют разные столбцы.\nБудут использованы только общие столбцы.\n\nОтсылка на кнопку отклонить в 1C.", root)
 
     # Создаем новый файл для сохранения результатов
@@ -61,6 +65,22 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
     fill_light_green = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
     fill_green = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
+    fill_light_orange = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Светло-оранжевый
+
+    # Окрашиваем столбцы, которые не учтены
+    unused_columns1 = columns1 - columns2
+    unused_columns2 = columns2 - columns1
+
+    # Выделяем столбцы, отсутствующие в одной из таблиц
+    for col_name in unused_columns1:
+        col_index = table2.columns.get_loc(col_name) + 1
+        for row in range(1, len(table2) + 2):  # Включаем заголовок
+            new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
+
+    for col_name in unused_columns2:
+        col_index = table2.columns.get_loc(col_name) + 1
+        for row in range(1, len(table2) + 2):  # Включаем заголовок
+            new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
 
     # Создаем словарь для быстрого поиска строк в table1 по значению ключевого столбца
     table1_dict = table1.set_index(key_column).T.to_dict()
