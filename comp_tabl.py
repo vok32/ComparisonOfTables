@@ -29,8 +29,43 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     # Проверка наличия одинаковых столбцов
     if list(table1.columns) != list(table2.columns):
         user_choice = messagebox.askyesno("Ошибка", "Таблицы имеют разные столбцы. Игнорировать столбцы с несовпадающими именами?")
-        if not user_choice:
+        if user_choice:
+            # Сохраняем порядок столбцов как в table2, выбирая только общие столбцы
+            common_columns = list(set(table1.columns).intersection(set(table2.columns)))
+            table1 = table1[common_columns]
+            table2 = table2[common_columns]
+        else:
+            # Заполняем новую таблицу данными из обеих таблиц, сохраняя все столбцы
+            new_workbook = Workbook()
+            new_sheet = new_workbook.active
+            new_sheet.title = "Результаты сравнения"
+
+            # Записываем заголовки столбцов из table2
+            for col_index, col_name in enumerate(table2.columns, start=1):
+                new_sheet.cell(row=1, column=col_index).value = col_name
+
+            fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+
+            # Заполняем данными из table2, выделяя различия
+            for index, row in table2.iterrows():
+                for col_index, col_name in enumerate(table2.columns, start=1):
+                    new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
+                    if col_name not in table1.columns or row[col_name] != table1.loc[index, col_name]:
+                        new_sheet.cell(row=index + 2, column=col_index).fill = fill_yellow
+
+            # Удаление пустых строк
+            remove_empty_rows(new_sheet)
+
+            # Генерация уникального имени файла для сохранения
+            output_path = get_next_filename(output_path)
+
+            # Сохранение файла
+            new_workbook.save(output_path)
+            
+            # Отображение окна с сообщением об успешном сохранении
+            show_success_window(output_path, root, position)
             return
+
         common_columns = list(set(table1.columns).intersection(set(table2.columns)))
         table1 = table1[common_columns]
         table2 = table2[common_columns]
@@ -153,13 +188,6 @@ def select_files(root):
             messagebox.showerror("Ошибка", f"Не удалось загрузить столбцы из файла: {file_path}\nОшибка: {str(e)}")
             return []
 
-    def update_columns_list(event=None):
-        file_path = file1_entry.get()
-        if not file_path:
-            return
-        columns = load_columns(file_path)
-        key_column_combo['values'] = columns
-
     def show_columns_selection():
         file1_path = file1_entry.get()
         file2_path = file2_entry.get()
@@ -170,17 +198,26 @@ def select_files(root):
             messagebox.showerror("Ошибка", "Не все поля были заполнены.")
             return
 
+        columns_file1 = load_columns(file1_path)
+        columns_file2 = load_columns(file2_path)
+
+        if len(columns_file1) <= len(columns_file2):
+            columns = columns_file1
+            compare_file = "первого файла"
+        else:
+            columns = columns_file2
+            compare_file = "второго файла"
+
         position = [root.winfo_x(), root.winfo_y()]  # Получаем позицию главного окна
 
         window = Toplevel(root)
         window.title("Выберите столбец для сравнения")
         window.geometry(f"400x200+{position[0]}+{position[1]}")
 
-        label = Label(window, text="Выберите столбец для сравнения:")
+        label = Label(window, text=f"Выберите столбец для сравнения из {compare_file}:")
         label.pack(pady=10)
 
         key_column_var = StringVar(window)
-        columns = load_columns(file1_path)
         key_column_combo = ttk.Combobox(window, width=30, textvariable=key_column_var, values=columns)
         key_column_combo.pack(pady=10)
 
