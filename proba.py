@@ -159,7 +159,6 @@ def select_files(root):
     def select_file1():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
         if filename:
-            # Проверяем расширение файла
             if filename.endswith(('.xlsx', '.xls')):
                 file1_entry.delete(0, END)
                 file1_entry.insert(0, filename)  # Сохраняем полный путь
@@ -169,29 +168,25 @@ def select_files(root):
     def select_file2():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
         if filename:
-            # Проверяем расширение файла
             if filename.endswith(('.xlsx', '.xls')):
-                file1_entry.delete(0, END)
-                file1_entry.insert(0, filename)  # Сохраняем полный путь
+                file2_entry.delete(0, END)
+                file2_entry.insert(0, filename)  # Сохраняем полный путь
             else:
                 messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
-
+                
     def select_output_folder():
         foldername = filedialog.askdirectory()
         if foldername:
             output_entry.delete(0, END)
             output_entry.insert(0, os.path.join(foldername, "differences.xlsx"))
         else:
-            set_default_output_path()
-
-    def set_default_output_path():
-        output_entry.delete(0, END)
-        desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
-        comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
-        if not os.path.exists(comparison_folder):
-            os.makedirs(comparison_folder)
-        output_entry.delete(0, END)
-        output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
+            output_entry.delete(0, END)
+            desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
+            comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+            if not os.path.exists(comparison_folder):
+                os.makedirs(comparison_folder)
+            output_entry.delete(0, END)
+            output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
 
     def load_columns(file_path):
         try:
