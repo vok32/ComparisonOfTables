@@ -220,18 +220,30 @@ def select_files(root):
         ok_button = Button(window, text="OK", command=on_ok)
         ok_button.pack(pady=10)
 
-    def show_about():
-        label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
-        label.pack()
+    def show_about(root, position):
+        about_window = Toplevel(root)
+        about_window.title("О разработчике")
+        
+        # Центрирование окна "О разработчике" относительно главного окна
+        root.update_idletasks()
+        root_position_x = root.winfo_x()
+        root_position_y = root.winfo_y()
+        about_window.geometry(f"500x150+{root_position_x}+{root_position_y}")
 
-        label = Label(developer_window, text="Программа создана сотрудником 3 меганаправления, студентом 305 кафедры", padx=10, pady=5)
-        label.pack()
+        label1 = Label(about_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
+        label1.pack()
 
-        label = Label(developer_window, text="и просто хорошим человеком - Матюшенко Романом", padx=10, pady=5)
-        label.pack()
+        label2 = Label(about_window, text="Программа создана сотрудником 3 меганаправления, студентом 305 кафедры", padx=10, pady=5)
+        label2.pack()
 
-        label = Label(developer_window, text="Ссылка на GitHub - https://github.com/vok32", padx=10, pady=5)
-        label.pack()
+        label3 = Label(about_window, text="и просто хорошим человеком - Матюшенко Романом", padx=10, pady=5)
+        label3.pack()
+
+        label4 = Label(about_window, text="Ссылка на GitHub - https://github.com/vok32", padx=10, pady=5)
+        label4.pack()
+
+        back_button = Button(about_window, text="Назад", command=about_window.destroy)
+        back_button.pack()
 
     root.title("Сравнение таблиц Excel")
 
