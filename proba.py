@@ -150,31 +150,31 @@ def show_success_window(output_path, root, position):
     close_button = Button(success_window, text="Готово", command=success_window.destroy)
     close_button.pack(pady=5)
 
-def open_output_folder(output_path):
-    os.system(f'xdg-open "{os.path.dirname(os.path.abspath(output_path))}"')
+    def open_output_folder(output_path):
+        os.system(f'xdg-open "{os.path.dirname(os.path.abspath(output_path))}"')
 
 def select_files(root):
     position = [root.winfo_x(), root.winfo_y()]
 
     def select_file1():
-    filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
-    if filename:
-        # Проверяем расширение файла
-        if filename.endswith(('.xlsx', '.xls')):
-            file1_entry.delete(0, END)
-            file1_entry.insert(0, filename)  # Сохраняем полный путь
-        else:
-            messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
+        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
+        if filename:
+            # Проверяем расширение файла
+            if filename.endswith(('.xlsx', '.xls')):
+                file1_entry.delete(0, END)
+                file1_entry.insert(0, filename)  # Сохраняем полный путь
+            else:
+                messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
 
     def select_file2():
-    filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
-    if filename:
-        # Проверяем расширение файла
-        if filename.endswith(('.xlsx', '.xls')):
-            file1_entry.delete(0, END)
-            file1_entry.insert(0, filename)  # Сохраняем полный путь
-        else:
-            messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
+        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
+        if filename:
+            # Проверяем расширение файла
+            if filename.endswith(('.xlsx', '.xls')):
+                file1_entry.delete(0, END)
+                file1_entry.insert(0, filename)  # Сохраняем полный путь
+            else:
+                messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
 
     def select_output_folder():
         foldername = filedialog.askdirectory()
