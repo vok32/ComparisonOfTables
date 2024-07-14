@@ -135,20 +135,25 @@ def show_success_window(output_path, root, position):
     success_window = Toplevel(root)
     success_window.title("Успех")
     
-    # Центрирование окна "Успех" относительно главного окна
-    root.update_idletasks()
-    root_position_x = root.winfo_x()
-    root_position_y = root.winfo_y()
-    success_window.geometry(f"400x150+{root_position_x}+{root_position_y}")
-    
+    # Добавляем текст для отображения
     label = Label(success_window, text=f"Результаты сравнения сохранены в файл:\n{output_path}")
-    label.pack(pady=10)
+    label.pack(padx=10, pady=10)
+
+    # Центрируем окно относительно главного окна
+    success_window.update_idletasks()  # Обновляем размеры окна
+    width = success_window.winfo_width()
+    height = success_window.winfo_height()
+    root_position_x = root.winfo_x() + (root.winfo_width() // 2) - (width // 2)
+    root_position_y = root.winfo_y() + (root.winfo_height() // 2) - (height // 2)
+    success_window.geometry(f"{width}x{height}+{root_position_x}+{root_position_y}")
     
     open_folder_button = Button(success_window, text="Открыть папку с файлом", command=lambda: open_output_folder(output_path))
     open_folder_button.pack(pady=5)
-    
+
     close_button = Button(success_window, text="Готово", command=success_window.destroy)
     close_button.pack(pady=5)
+
+    success_window.update()  # Обновляем окно, чтобы отобразить изменения
 
     def open_output_folder(output_path):
         os.system(f'xdg-open "{os.path.dirname(os.path.abspath(output_path))}"')
@@ -173,7 +178,7 @@ def select_files(root):
                 file2_entry.insert(0, filename)  # Сохраняем полный путь
             else:
                 messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
-                
+
     def select_output_folder():
         foldername = filedialog.askdirectory()
         if foldername:
@@ -315,7 +320,7 @@ def show_developer_info(root, position):
     root.update_idletasks()
     root_position_x = root.winfo_x()
     root_position_y = root.winfo_y()
-    developer_window.geometry(f"500x150+{root_position_x}+{root_position_y}")
+    developer_window.geometry(f"600x150+{root_position_x}+{root_position_y}")
     
     label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
     label.pack()
@@ -335,7 +340,7 @@ def show_developer_info(root, position):
 if __name__ == "__main__":
     root = Tk()
     root.title("Сравнение таблиц Excel")
-    root.geometry("700x475")
+    root.geometry("800x475")
 
     # Открытие окна по центру экрана
     window_width = 700
