@@ -199,7 +199,7 @@ def select_files(root):
             columns = columns_file2
             compare_file = "второго файла"
 
-        position = [root.winfo_x(), root.winfo_y()]  # Получаем позицию главного окна
+        position = [root.winfo_x(), root.winfo_y()]
 
         window = Toplevel(root)
         window.title("Выберите столбец для сравнения")
@@ -208,118 +208,63 @@ def select_files(root):
         label = Label(window, text=f"Выберите столбец для сравнения из {compare_file}:")
         label.pack(pady=10)
 
-        key_column_var = StringVar(window)
-        key_column_combo = ttk.Combobox(window, width=30, textvariable=key_column_var, values=columns)
-        key_column_combo.pack(pady=10)
+        combo = ttk.Combobox(window, values=columns, state="readonly")
+        combo.pack(pady=5)
+        combo.current(0)
 
-        def start_comparison():
-            key_column = key_column_var.get().strip()
-            if not key_column:
-                messagebox.showerror("Ошибка", "Выберите столбец для сравнения.")
-                return
+        def on_ok():
+            selected_column = combo.get()
             window.destroy()
-            compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root, position)
+            compare_excel_tables(file1_path, file2_path, output_path, save_option, selected_column, root, position)
 
-        button = Button(window, text="Начать сравнение", command=start_comparison)
-        button.pack(pady=10)
+        ok_button = Button(window, text="OK", command=on_ok)
+        ok_button.pack(pady=10)
 
-    frame = Frame(root, padx=10, pady=10)
-    frame.pack(padx=10, pady=10)
+    def show_about():
+        label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
+        label.pack()
 
-    file1_label = Label(frame, text="Выберите первый файл:")
-    file1_label.grid(row=0, column=0, sticky=W)
+        label = Label(developer_window, text="Программа создана сотрудником 3 меганаправления, студентом 305 кафедры", padx=10, pady=5)
+        label.pack()
 
-    file1_entry = Entry(frame, width=50)
-    file1_entry.grid(row=0, column=1, padx=5, pady=5)
+        label = Label(developer_window, text="и просто хорошим человеком - Матюшенко Романом", padx=10, pady=5)
+        label.pack()
 
-    file1_button = Button(frame, text="Выбрать файл", command=select_file1)
-    file1_button.grid(row=0, column=2, padx=5, pady=5)
+        label = Label(developer_window, text="Ссылка на GitHub - https://github.com/vok32", padx=10, pady=5)
+        label.pack()
 
-    file2_label = Label(frame, text="Выберите второй файл:")
-    file2_label.grid(row=1, column=0, sticky=W)
+    root.title("Сравнение таблиц Excel")
 
-    file2_entry = Entry(frame, width=50)
-    file2_entry.grid(row=1, column=1, padx=5, pady=5)
+    main_frame = Frame(root)
+    main_frame.pack(pady=20)
 
-    file2_button = Button(frame, text="Выбрать файл", command=select_file2)
-    file2_button.grid(row=1, column=2, padx=5, pady=5)
+    Label(main_frame, text="Выберите первый файл Excel:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
+    file1_entry = Entry(main_frame, width=50)
+    file1_entry.grid(row=0, column=1, padx=10, pady=5)
+    Button(main_frame, text="Обзор...", command=select_file1).grid(row=0, column=2, padx=10, pady=5)
 
-    output_label = Label(frame, text="Выберите папку для сохранения:")
-    output_label.grid(row=2, column=0, sticky=W)
+    Label(main_frame, text="Выберите второй файл Excel:").grid(row=1, column=0, sticky=W, padx=10, pady=5)
+    file2_entry = Entry(main_frame, width=50)
+    file2_entry.grid(row=1, column=1, padx=10, pady=5)
+    Button(main_frame, text="Обзор...", command=select_file2).grid(row=1, column=2, padx=10, pady=5)
 
-    output_entry = Entry(frame, width=50)
-    output_entry.grid(row=2, column=1, padx=5, pady=5)
+    Label(main_frame, text="Выберите папку для сохранения результата:").grid(row=2, column=0, sticky=W, padx=10, pady=5)
+    output_entry = Entry(main_frame, width=50)
+    output_entry.grid(row=2, column=1, padx=10, pady=5)
+    Button(main_frame, text="Обзор...", command=select_output_folder).grid(row=2, column=2, padx=10, pady=5)
 
-    desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-    comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
-    if not os.path.exists(comparison_folder):
-        os.makedirs(comparison_folder)
-    output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
-
-    output_button = Button(frame, text="Выбрать папку", command=select_output_folder)
-    output_button.grid(row=2, column=2, padx=5, pady=5)
-
-    def update_filename():
-        filename = simpledialog.askstring("Введите имя файла", "Имя файла:", parent=root)
-        if filename:
-            folder_path = os.path.dirname(output_entry.get())
-            output_entry.delete(0, END)
-            output_entry.insert(0, os.path.join(folder_path, f"{filename}.xlsx"))
-
-    filename_button = Button(frame, text="Изменить имя файла", command=update_filename)
-    filename_button.grid(row=3, column=2, padx=5, pady=5)
-
-    save_label = Label(frame, text="Что сохранить в файле:")
-    save_label.grid(row=4, column=0, sticky=W)
-
+    Label(main_frame, text="Опции сохранения:").grid(row=3, column=0, sticky=W, padx=10, pady=5)
     save_option_var = StringVar(value="Все строки")
+    save_options = ["Все строки", "Только измененные строки", "Только новые строки", "Новые/измененные строки"]
+    save_option_menu = ttk.Combobox(main_frame, textvariable=save_option_var, values=save_options, state="readonly")
+    save_option_menu.grid(row=3, column=1, padx=10, pady=5)
+    save_option_menu.current(0)
 
-    save_radio1 = Radiobutton(frame, text="Все строки", variable=save_option_var, value="Все строки")
-    save_radio1.grid(row=4, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+    Button(main_frame, text="Сравнить таблицы", command=show_columns_selection).grid(row=4, columnspan=3, pady=20)
 
-    save_radio2 = Radiobutton(frame, text="Только новые строки", variable=save_option_var, value="Только новые строки")
-    save_radio2.grid(row=5, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+    Button(main_frame, text="О разработчике", command=show_about).grid(row=5, columnspan=3, pady=10)
 
-    save_radio3 = Radiobutton(frame, text="Только измененные строки", variable=save_option_var, value="Только измененные строки")
-    save_radio3.grid(row=6, column=1, columnspan=2, padx=5, pady=5, sticky=W)
-
-    save_radio4 = Radiobutton(frame, text="Новые+измененные строки", variable=save_option_var, value="Новые/измененные строки")
-    save_radio4.grid(row=7, column=1, columnspan=2, padx=5, pady=5, sticky=W)
-
-    start_button = Button(root, text="Далее", command=show_columns_selection, width=20)
-    start_button.pack(pady=10, padx=10)
-
-    developer_button = Button(root, text="О разработчике", command=lambda: show_developer_info(root, position), width=20)
-    developer_button.pack(pady=10, padx=10)
-
-    save_label = Label(frame, text="© 3МН")
-    save_label.grid(row=8, column=2, sticky=E, pady=10)
-
-# О разработчике
-def show_developer_info(root, position):
-    developer_window = Toplevel(root)
-    developer_window.title("О разработчике")
-    
-    # Центрирование окна "О разработчике" относительно главного окна
-    root.update_idletasks()
-    root_position_x = root.winfo_x()
-    root_position_y = root.winfo_y()
-    developer_window.geometry(f"500x150+{root_position_x}+{root_position_y}")
-    
-    label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
-    label.pack()
-
-    label = Label(developer_window, text="Программа создана сотрудником 3 меганаправления, студентом 305 кафедры", padx=10, pady=5)
-    label.pack()
-
-    label = Label(developer_window, text="и просто хорошим человеком - Матюшенко Романом", padx=10, pady=5)
-    label.pack()
-
-    label = Label(developer_window, text="Ссылка на GitHub - https://github.com/vok32", padx=10, pady=5)
-    label.pack()
-
-    back_button = Button(developer_window, text="Назад", command=developer_window.destroy)
-    back_button.pack()
+    set_default_output_path()
 
 if __name__ == "__main__":
     root = Tk()
