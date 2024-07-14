@@ -157,16 +157,24 @@ def select_files(root):
     position = [root.winfo_x(), root.winfo_y()]
 
     def select_file1():
-        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
-        if filename:
+    filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
+    if filename:
+        # Проверяем расширение файла
+        if filename.endswith(('.xlsx', '.xls')):
             file1_entry.delete(0, END)
             file1_entry.insert(0, filename)  # Сохраняем полный путь
+        else:
+            messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
 
     def select_file2():
-        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
-        if filename:
-            file2_entry.delete(0, END)
-            file2_entry.insert(0, filename)  # Сохраняем полный путь
+    filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
+    if filename:
+        # Проверяем расширение файла
+        if filename.endswith(('.xlsx', '.xls')):
+            file1_entry.delete(0, END)
+            file1_entry.insert(0, filename)  # Сохраняем полный путь
+        else:
+            messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
 
     def select_output_folder():
         foldername = filedialog.askdirectory()
@@ -177,6 +185,7 @@ def select_files(root):
             set_default_output_path()
 
     def set_default_output_path():
+        output_entry.delete(0, END)
         desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
         comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
         if not os.path.exists(comparison_folder):
