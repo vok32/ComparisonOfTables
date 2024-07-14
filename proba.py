@@ -161,22 +161,20 @@ def select_files(root):
     position = [root.winfo_x(), root.winfo_y()]
 
     def select_file1():
-        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
+        filename = filedialog.askopenfilename(filetypes=[("Все файлы", "*.*")])
         if filename:
-            # Дополнительная проверка для обработки файлов с .xlsx в названии
-            if filename.endswith(('.xlsx', '.xls')) or ".xlsx" in filename or ".xls" in filename:
+            if filename.endswith(('.xlsx', '.xls')) or (".xlsx" in filename or ".xls" in filename):
                 file1_entry.delete(0, END)
                 file1_entry.insert(0, filename)  # Сохраняем полный путь
             else:
                 messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
 
     def select_file2():
-        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
+        filename = filedialog.askopenfilename(filetypes=[("Все файлы", "*.*")])
         if filename:
-            # Дополнительная проверка для обработки файлов с .xlsx в названии
-            if filename.endswith(('.xlsx', '.xls')) or ".xlsx" in filename or ".xls" in filename:
-                file1_entry.delete(0, END)
-                file1_entry.insert(0, filename)  # Сохраняем полный путь
+            if filename.endswith(('.xlsx', '.xls')) or (".xlsx" in filename or ".xls" in filename):
+                file2_entry.delete(0, END)
+                file2_entry.insert(0, filename)  # Сохраняем полный путь
             else:
                 messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
 
