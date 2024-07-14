@@ -151,15 +151,10 @@ def show_success_window(output_path, root, position):
     close_button.pack(pady=5)
 
 def open_output_folder(output_path):
-    if platform.system() == "Windows":
-        os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
-    elif platform.system() == "Darwin":
-        os.system(f'open -R "{os.path.abspath(output_path)}"')
-    else:
-        os.system(f'xdg-open "{os.path.dirname(os.path.abspath(output_path))}"')
+    os.system(f'xdg-open "{os.path.dirname(os.path.abspath(output_path))}"')
 
 def select_files(root):
-    position = [root.winfo_x(), root.winfo_y()]  # Получаем позицию главного окна
+    position = [root.winfo_x(), root.winfo_y()]
 
     def select_file1():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
@@ -268,12 +263,6 @@ def select_files(root):
     output_entry = Entry(frame, width=50)
     output_entry.grid(row=2, column=1, padx=5, pady=5)
 
-    desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-    comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
-    if not os.path.exists(comparison_folder):
-        os.makedirs(comparison_folder)
-    output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
-
     output_button = Button(frame, text="Выбрать папку", command=select_output_folder)
     output_button.grid(row=2, column=2, padx=5, pady=5)
 
@@ -339,7 +328,7 @@ def show_developer_info(root, position):
     back_button = Button(developer_window, text="Назад", command=developer_window.destroy)
     back_button.pack()
 
-def main():
+if __name__ == "__main__":
     root = Tk()
     root.title("Сравнение таблиц Excel")
     root.geometry("700x475")
@@ -352,9 +341,5 @@ def main():
     position_top = int(screen_height / 2 - window_height / 2)
     position_right = int(screen_width / 2 - window_width / 2)
     root.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
-    
     select_files(root)
     root.mainloop()
-
-if __name__ == "__main__":
-    main()
