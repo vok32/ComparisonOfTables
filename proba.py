@@ -142,10 +142,9 @@ def show_success_window(output_path, root, position):
     # Центрируем окно относительно главного окна
     success_window.update_idletasks()  # Обновляем размеры окна
     width = success_window.winfo_width()
-    height = success_window.winfo_height()
     root_position_x = root.winfo_x()
     root_position_y = root.winfo_y()
-    success_window.geometry(f"{width}x{height}+{root_position_x}+{root_position_y}")
+    success_window.geometry(f"{width}x150+{root_position_x}+{root_position_y}")
     
     open_folder_button = Button(success_window, text="Открыть папку с файлом", command=lambda: open_output_folder(output_path))
     open_folder_button.pack(pady=5)
@@ -164,7 +163,7 @@ def select_files(root):
     def select_file1():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
         if filename:
-            if filename.endswith(('.xlsx', '.xls')):
+            if filename.endswith(('.xlsx', '.xls')) or (".xlsx" in filename or ".xls" in filename):
                 file1_entry.delete(0, END)
                 file1_entry.insert(0, filename)  # Сохраняем полный путь
             else:
@@ -173,24 +172,38 @@ def select_files(root):
     def select_file2():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls"), ("Все файлы", "*.*")])
         if filename:
-            if filename.endswith(('.xlsx', '.xls')):
+            if filename.endswith(('.xlsx', '.xls')) or (".xlsx" in filename or ".xls" in filename):
                 file2_entry.delete(0, END)
                 file2_entry.insert(0, filename)  # Сохраняем полный путь
             else:
                 messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
+
+    # def select_output_folder():
+    #     foldername = filedialog.askdirectory()
+    #     if foldername:
+    #         output_entry.delete(0, END)
+    #         output_entry.insert(0, os.path.join(foldername, "differences.xlsx"))
+
+    #     # Вызовите эту функцию при инициализации
+    #     desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
+    #     comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+    #     if not os.path.exists(comparison_folder):
+    #         os.makedirs(comparison_folder)
+    #     output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
 
     def select_output_folder():
         foldername = filedialog.askdirectory()
         if foldername:
             output_entry.delete(0, END)
             output_entry.insert(0, os.path.join(foldername, "differences.xlsx"))
-        else:
-            output_entry.delete(0, END)
-            desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
-            comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
-            if not os.path.exists(comparison_folder):
-                os.makedirs(comparison_folder)
-            output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
+
+    def initialize_output_folder():
+        # Путь к рабочему столу в Linux
+        desktop = os.path.join(os.path.expanduser("~"), 'Рабочий стол')
+        comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+        if not os.path.exists(comparison_folder):
+            os.makedirs(comparison_folder)
+        output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
 
     def load_columns(file_path):
         try:
@@ -339,10 +352,10 @@ def show_developer_info(root, position):
 if __name__ == "__main__":
     root = Tk()
     root.title("Сравнение таблиц Excel")
-    root.geometry("800x475")
+    root.geometry("900x475")
 
     # Открытие окна по центру экрана
-    window_width = 800
+    window_width = 900
     window_height = 475
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
@@ -351,3 +364,4 @@ if __name__ == "__main__":
     root.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
     select_files(root)
     root.mainloop()
+    initialize_output_folder()
