@@ -344,11 +344,11 @@ def show_developer_info(root, position):
 if __name__ == "__main__":
     root = Tk()
     root.title("Сравнение таблиц Excel")
-    root.geometry("900x475")
+    root.geometry("910x490")
 
     # Открытие окна по центру экрана
-    window_width = 900
-    window_height = 475
+    window_width = 910
+    window_height = 490
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     position_top = int(screen_height / 2 - window_height / 2)

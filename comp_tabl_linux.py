@@ -1,8 +1,7 @@
 import os
-import platform
 import pandas as pd
 from tkinter import *
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, simpledialog  
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
 
@@ -26,7 +25,8 @@ def custom_messagebox(title, message, root):
     window = Toplevel(root)
     window.title(title)
 
-    window.geometry(f"400x125+{root.winfo_x()}+{root.winfo_y()}")
+    # Центрирование окна в левом верхнем углу приложения
+    window.geometry(f"400x125+{root.winfo_x()}+{root.winfo_y()}")  # Позиция в левом верхнем углу
 
     label = Label(window, text=message)
     label.pack(pady=10)
@@ -34,38 +34,47 @@ def custom_messagebox(title, message, root):
     accept_button = Button(window, text="Принять", command=window.destroy)
     accept_button.pack(pady=5)
 
-    window.transient()
-    window.grab_set()
-    window.focus_set()
-    window.wait_window()
+    window.transient()  # Делает окно модальным
+    window.grab_set()   # Блокирует родительское окно
+    window.focus_set()  # Устанавливает фокус на новое окно
+    window.wait_window()  # Ожидает закрытия окна
 
 def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root, position):
+    # Чтение таблиц из файлов Excel
     table1 = pd.read_excel(file1_path, engine='openpyxl')
     table2 = pd.read_excel(file2_path, engine='openpyxl')
 
+    # Получаем имена столбцов
     columns1 = set(table1.columns)
     columns2 = set(table2.columns)
 
+    # Проверка наличия одинаковых столбцов
     if columns1 != columns2:
         custom_messagebox("Ошибка", "Таблицы имеют разные столбцы.\nБудут использованы только общие столбцы.\n\nОтсылка на кнопку отклонить в 1C.", root)
 
+    # Создаем новый файл для сохранения результатов
     new_workbook = Workbook()
     new_sheet = new_workbook.active
     new_sheet.title = "Результаты сравнения"
 
+    # Записываем заголовки столбцов в том же порядке, как в table2
     for col_index, col_name in enumerate(table2.columns, start=1):
         new_sheet.cell(row=1, column=col_index).value = col_name
 
+    # Цвет заливки для выделения различий
     fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
     fill_light_green = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
     fill_green = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
-    fill_light_orange = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")
+    fill_light_orange = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Светло-оранжевый
 
+    # Создаем словарь для быстрого поиска строк в table1 по значению ключевого столбца
     table1_dict = table1.set_index(key_column).T.to_dict()
 
+    # Обход всех строк второй таблицы и сравнение с соответствующими строками первой таблицы
     for index, row in table2.iterrows():
         key_value = row[key_column]
         if key_value in table1_dict:
+            # Найдена строка с таким же ключевым значением, проверяем на изменения
             table1_row = table1_dict[key_value]
             differences = False
             for col_index, col_name in enumerate(table2.columns, start=1):
@@ -78,6 +87,7 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
                     if new_sheet.cell(row=index + 2, column=col_index).fill != fill_green:
                         new_sheet.cell(row=index + 2, column=col_index).fill = fill_light_green
         else:
+            # Строка с таким ключевым значением отсутствует в table1, выделяем всю строку
             if save_option in ["Все строки", "Только новые строки", "Новые/измененные строки"]:
                 for col_index, col_name in enumerate(table2.columns, start=1):
                     new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
@@ -90,70 +100,83 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
                 if cell.value is None:
                     cell.value = row[col_name]
 
+    # Удаление пустых строк
     remove_empty_rows(new_sheet)
 
+    # Окрашиваем неучтенные столбцы в светло-оранжевый
     unused_columns1 = columns1 - columns2
     unused_columns2 = columns2 - columns1
 
-    max_rows = new_sheet.max_row
+    # Определяем фактическое количество строк в новом файле
+    max_rows = new_sheet.max_row  # Получаем количество строк в new_sheet
 
     for col_name in unused_columns1:
         if col_name in table2.columns:
             continue
         col_index = table2.columns.get_loc(col_name) + 1
-        for row in range(1, max_rows + 1):
+        for row in range(1, max_rows + 1):  # Включаем заголовок
             new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
 
     for col_name in unused_columns2:
         col_index = table2.columns.get_loc(col_name) + 1
-        for row in range(1, max_rows + 1):
+        for row in range(1, max_rows + 1):  # Включаем заголовок
             new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
 
+    # Генерация уникального имени файла для сохранения
     output_path = get_next_filename(output_path)
+
+    # Сохранение файла
     new_workbook.save(output_path)
 
+    # Отображение окна с сообщением об успешном сохранении
     show_success_window(output_path, root, position)
 
 def show_success_window(output_path, root, position):
     success_window = Toplevel(root)
     success_window.title("Успех")
     
-    root.update_idletasks()
+    # Добавляем текст для отображения
+    label = Label(success_window, text=f"Результаты сравнения сохранены в файл:\n{output_path}")
+    label.pack(padx=10, pady=10)
+
+    # Центрируем окно относительно главного окна
+    success_window.update_idletasks()  # Обновляем размеры окна
+    width = success_window.winfo_width()
     root_position_x = root.winfo_x()
     root_position_y = root.winfo_y()
-    success_window.geometry(f"400x150+{root_position_x}+{root_position_y}")
-    
-    label = Label(success_window, text=f"Результаты сравнения сохранены в файл:\n{output_path}")
-    label.pack(pady=10)
+    success_window.geometry(f"{width}x150+{root_position_x}+{root_position_y}")
     
     open_folder_button = Button(success_window, text="Открыть папку с файлом", command=lambda: open_output_folder(output_path))
     open_folder_button.pack(pady=5)
-    
+
     close_button = Button(success_window, text="Готово", command=success_window.destroy)
     close_button.pack(pady=5)
 
-def open_output_folder(output_path):
-    if platform.system() == "Windows":
-        os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
-    elif platform.system() == "Darwin":
-        os.system(f'open -R "{os.path.abspath(output_path)}"')
-    else:
+    success_window.update()  # Обновляем окно, чтобы отобразить изменения
+
+    def open_output_folder(output_path):
         os.system(f'xdg-open "{os.path.dirname(os.path.abspath(output_path))}"')
 
 def select_files(root):
     position = [root.winfo_x(), root.winfo_y()]
 
     def select_file1():
-        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
+        filename = filedialog.askopenfilename(filetypes=[("Все файлы", "*.*")])
         if filename:
-            file1_entry.delete(0, END)
-            file1_entry.insert(0, filename)
+            if filename.endswith(('.xlsx', '.xls')) or (".xlsx" in filename or ".xls" in filename):
+                file1_entry.delete(0, END)
+                file1_entry.insert(0, filename)  # Сохраняем полный путь
+            else:
+                messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
 
     def select_file2():
-        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
+        filename = filedialog.askopenfilename(filetypes=[("Все файлы", "*.*")])
         if filename:
-            file2_entry.delete(0, END)
-            file2_entry.insert(0, filename)
+            if filename.endswith(('.xlsx', '.xls')) or (".xlsx" in filename or ".xls" in filename):
+                file2_entry.delete(0, END)
+                file2_entry.insert(0, filename)  # Сохраняем полный путь
+            else:
+                messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
 
     def select_output_folder():
         foldername = filedialog.askdirectory()
@@ -161,15 +184,12 @@ def select_files(root):
             output_entry.delete(0, END)
             output_entry.insert(0, os.path.join(foldername, "differences.xlsx"))
         else:
-            set_default_output_path()
-
-    def set_default_output_path():
-        desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
-        comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
-        if not os.path.exists(comparison_folder):
-            os.makedirs(comparison_folder)
-        output_entry.delete(0, END)
-        output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
+            output_entry.delete(0, END)
+            desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
+            comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+            if not os.path.exists(comparison_folder):
+                os.makedirs(comparison_folder)
+            output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
 
     def load_columns(file_path):
         try:
@@ -199,7 +219,7 @@ def select_files(root):
             columns = columns_file2
             compare_file = "второго файла"
 
-        position = [root.winfo_x(), root.winfo_y()]
+        position = [root.winfo_x(), root.winfo_y()]  # Получаем позицию главного окна
 
         window = Toplevel(root)
         window.title("Выберите столбец для сравнения")
@@ -208,78 +228,132 @@ def select_files(root):
         label = Label(window, text=f"Выберите столбец для сравнения из {compare_file}:")
         label.pack(pady=10)
 
-        combo = ttk.Combobox(window, values=columns, state="readonly")
-        combo.pack(pady=5)
-        combo.current(0)
+        key_column_var = StringVar(window)
+        key_column_combo = ttk.Combobox(window, width=30, textvariable=key_column_var, values=columns)
+        key_column_combo.pack(pady=10)
 
-        def on_ok():
-            selected_column = combo.get()
+        def start_comparison():
+            key_column = key_column_var.get().strip()
+            if not key_column:
+                messagebox.showerror("Ошибка", "Выберите столбец для сравнения.")
+                return
             window.destroy()
-            compare_excel_tables(file1_path, file2_path, output_path, save_option, selected_column, root, position)
+            compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root, position)
 
-        ok_button = Button(window, text="OK", command=on_ok)
-        ok_button.pack(pady=10)
+        button = Button(window, text="Начать сравнение", command=start_comparison)
+        button.pack(pady=10)
 
-    def show_about(root, position):
-        about_window = Toplevel(root)
-        about_window.title("О разработчике")
-        
-        # Центрирование окна "О разработчике" относительно главного окна
-        root.update_idletasks()
-        root_position_x = root.winfo_x()
-        root_position_y = root.winfo_y()
-        about_window.geometry(f"500x150+{root_position_x}+{root_position_y}")
+    frame = Frame(root, padx=10, pady=10)
+    frame.pack(padx=10, pady=10)
 
-        label1 = Label(about_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
-        label1.pack()
+    file1_label = Label(frame, text="Выберите первый файл:")
+    file1_label.grid(row=0, column=0, sticky=W)
 
-        label2 = Label(about_window, text="Программа создана сотрудником 3 меганаправления, студентом 305 кафедры", padx=10, pady=5)
-        label2.pack()
+    file1_entry = Entry(frame, width=50)
+    file1_entry.grid(row=0, column=1, padx=5, pady=5)
 
-        label3 = Label(about_window, text="и просто хорошим человеком - Матюшенко Романом", padx=10, pady=5)
-        label3.pack()
+    file1_button = Button(frame, text="Выбрать файл", command=select_file1)
+    file1_button.grid(row=0, column=2, padx=5, pady=5)
 
-        label4 = Label(about_window, text="Ссылка на GitHub - https://github.com/vok32", padx=10, pady=5)
-        label4.pack()
+    file2_label = Label(frame, text="Выберите второй файл:")
+    file2_label.grid(row=1, column=0, sticky=W)
 
-        back_button = Button(about_window, text="Назад", command=about_window.destroy)
-        back_button.pack()
+    file2_entry = Entry(frame, width=50)
+    file2_entry.grid(row=1, column=1, padx=5, pady=5)
 
-    root.title("Сравнение таблиц Excel")
+    file2_button = Button(frame, text="Выбрать файл", command=select_file2)
+    file2_button.grid(row=1, column=2, padx=5, pady=5)
 
-    main_frame = Frame(root)
-    main_frame.pack(pady=20)
+    output_label = Label(frame, text="Выберите папку для сохранения:")
+    output_label.grid(row=2, column=0, sticky=W)
 
-    Label(main_frame, text="Выберите первый файл Excel:").grid(row=0, column=0, sticky=W, padx=10, pady=5)
-    file1_entry = Entry(main_frame, width=50)
-    file1_entry.grid(row=0, column=1, padx=10, pady=5)
-    Button(main_frame, text="Обзор...", command=select_file1).grid(row=0, column=2, padx=10, pady=5)
+    output_entry = Entry(frame, width=50)
+    output_entry.grid(row=2, column=1, padx=5, pady=5)
 
-    Label(main_frame, text="Выберите второй файл Excel:").grid(row=1, column=0, sticky=W, padx=10, pady=5)
-    file2_entry = Entry(main_frame, width=50)
-    file2_entry.grid(row=1, column=1, padx=10, pady=5)
-    Button(main_frame, text="Обзор...", command=select_file2).grid(row=1, column=2, padx=10, pady=5)
+    desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
+    comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+    if not os.path.exists(comparison_folder):
+        os.makedirs(comparison_folder)
+    output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
 
-    Label(main_frame, text="Выберите папку для сохранения результата:").grid(row=2, column=0, sticky=W, padx=10, pady=5)
-    output_entry = Entry(main_frame, width=50)
-    output_entry.grid(row=2, column=1, padx=10, pady=5)
-    Button(main_frame, text="Обзор...", command=select_output_folder).grid(row=2, column=2, padx=10, pady=5)
+    output_button = Button(frame, text="Выбрать папку", command=select_output_folder)
+    output_button.grid(row=2, column=2, padx=5, pady=5)
 
-    Label(main_frame, text="Опции сохранения:").grid(row=3, column=0, sticky=W, padx=10, pady=5)
+    def update_filename():
+        filename = simpledialog.askstring("Введите имя файла", "Имя файла:", parent=root)
+        if filename:
+            folder_path = os.path.dirname(output_entry.get())
+            output_entry.delete(0, END)
+            output_entry.insert(0, os.path.join(folder_path, f"{filename}.xlsx"))
+
+    filename_button = Button(frame, text="Изменить имя файла", command=update_filename)
+    filename_button.grid(row=3, column=2, padx=5, pady=5)
+
+    save_label = Label(frame, text="Что сохранить в файле:")
+    save_label.grid(row=4, column=0, sticky=W)
+
     save_option_var = StringVar(value="Все строки")
-    save_options = ["Все строки", "Только измененные строки", "Только новые строки", "Новые/измененные строки"]
-    save_option_menu = ttk.Combobox(main_frame, textvariable=save_option_var, values=save_options, state="readonly")
-    save_option_menu.grid(row=3, column=1, padx=10, pady=5)
-    save_option_menu.current(0)
 
-    Button(main_frame, text="Сравнить таблицы", command=show_columns_selection).grid(row=4, columnspan=3, pady=20)
+    save_radio1 = Radiobutton(frame, text="Все строки", variable=save_option_var, value="Все строки")
+    save_radio1.grid(row=4, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
-    Button(main_frame, text="О разработчике", command=show_about).grid(row=5, columnspan=3, pady=10)
+    save_radio2 = Radiobutton(frame, text="Только новые строки", variable=save_option_var, value="Только новые строки")
+    save_radio2.grid(row=5, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
-    set_default_output_path()
+    save_radio3 = Radiobutton(frame, text="Только измененные строки", variable=save_option_var, value="Только измененные строки")
+    save_radio3.grid(row=6, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+
+    save_radio4 = Radiobutton(frame, text="Новые+измененные строки", variable=save_option_var, value="Новые/измененные строки")
+    save_radio4.grid(row=7, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+
+    start_button = Button(root, text="Далее", command=show_columns_selection, width=20)
+    start_button.pack(pady=10, padx=10)
+
+    developer_button = Button(root, text="О разработчике", command=lambda: show_developer_info(root, position), width=20)
+    developer_button.pack(pady=10, padx=10)
+
+    save_label = Label(frame, text="© 3МН")
+    save_label.grid(row=8, column=2, sticky=E, pady=10)
+
+# О разработчике
+def show_developer_info(root, position):
+    developer_window = Toplevel(root)
+    developer_window.title("О разработчике")
+    
+    # Центрирование окна "О разработчике" относительно главного окна
+    root.update_idletasks()
+    root_position_x = root.winfo_x()
+    root_position_y = root.winfo_y()
+    developer_window.geometry(f"600x150+{root_position_x}+{root_position_y}")
+    
+    label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
+    label.pack()
+
+    label = Label(developer_window, text="Программа создана сотрудником 3 меганаправления, студентом 305 кафедры", padx=10, pady=5)
+    label.pack()
+
+    label = Label(developer_window, text="и просто хорошим человеком - Матюшенко Романом", padx=10, pady=5)
+    label.pack()
+
+    label = Label(developer_window, text="Ссылка на GitHub - https://github.com/vok32", padx=10, pady=5)
+    label.pack()
+
+    back_button = Button(developer_window, text="Назад", command=developer_window.destroy)
+    back_button.pack()
 
 if __name__ == "__main__":
     root = Tk()
-    root.geometry("600x400")
+    root.title("Сравнение таблиц Excel")
+    root.geometry("910x490")
+
+    # Открытие окна по центру экрана
+    window_width = 910
+    window_height = 490
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    position_top = int(screen_height / 2 - window_height / 2)
+    position_right = int(screen_width / 2 - window_width / 2)
+    root.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
     select_files(root)
     root.mainloop()
+    initialize_output_folder()
