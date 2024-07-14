@@ -143,8 +143,8 @@ def show_success_window(output_path, root, position):
     success_window.update_idletasks()  # Обновляем размеры окна
     width = success_window.winfo_width()
     height = success_window.winfo_height()
-    root_position_x = root.winfo_x() + (root.winfo_width() // 2) - (width // 2)
-    root_position_y = root.winfo_y() + (root.winfo_height() // 2) - (height // 2)
+    root_position_x = root.winfo_x()
+    root_position_y = root.winfo_y()
     success_window.geometry(f"{width}x{height}+{root_position_x}+{root_position_y}")
     
     open_folder_button = Button(success_window, text="Открыть папку с файлом", command=lambda: open_output_folder(output_path))
@@ -190,7 +190,6 @@ def select_files(root):
             comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
             if not os.path.exists(comparison_folder):
                 os.makedirs(comparison_folder)
-            output_entry.delete(0, END)
             output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
 
     def load_columns(file_path):
@@ -343,7 +342,7 @@ if __name__ == "__main__":
     root.geometry("800x475")
 
     # Открытие окна по центру экрана
-    window_width = 700
+    window_width = 800
     window_height = 475
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
