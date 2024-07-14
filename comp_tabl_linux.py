@@ -1,7 +1,8 @@
 import os
+import platform
 import pandas as pd
 from tkinter import *
-from tkinter import filedialog, messagebox, ttk, simpledialog  
+from tkinter import filedialog, messagebox, ttk
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill
 
@@ -25,8 +26,7 @@ def custom_messagebox(title, message, root):
     window = Toplevel(root)
     window.title(title)
 
-    # Центрирование окна в левом верхнем углу приложения
-    window.geometry(f"400x125+{root.winfo_x()}+{root.winfo_y()}")  # Позиция в левом верхнем углу
+    window.geometry(f"400x125+{root.winfo_x()}+{root.winfo_y()}")
 
     label = Label(window, text=message)
     label.pack(pady=10)
@@ -34,47 +34,38 @@ def custom_messagebox(title, message, root):
     accept_button = Button(window, text="Принять", command=window.destroy)
     accept_button.pack(pady=5)
 
-    window.transient()  # Делает окно модальным
-    window.grab_set()   # Блокирует родительское окно
-    window.focus_set()  # Устанавливает фокус на новое окно
-    window.wait_window()  # Ожидает закрытия окна
+    window.transient()
+    window.grab_set()
+    window.focus_set()
+    window.wait_window()
 
 def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_column, root, position):
-    # Чтение таблиц из файлов Excel
     table1 = pd.read_excel(file1_path, engine='openpyxl')
     table2 = pd.read_excel(file2_path, engine='openpyxl')
 
-    # Получаем имена столбцов
     columns1 = set(table1.columns)
     columns2 = set(table2.columns)
 
-    # Проверка наличия одинаковых столбцов
     if columns1 != columns2:
         custom_messagebox("Ошибка", "Таблицы имеют разные столбцы.\nБудут использованы только общие столбцы.\n\nОтсылка на кнопку отклонить в 1C.", root)
 
-    # Создаем новый файл для сохранения результатов
     new_workbook = Workbook()
     new_sheet = new_workbook.active
     new_sheet.title = "Результаты сравнения"
 
-    # Записываем заголовки столбцов в том же порядке, как в table2
     for col_index, col_name in enumerate(table2.columns, start=1):
         new_sheet.cell(row=1, column=col_index).value = col_name
 
-    # Цвет заливки для выделения различий
     fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
     fill_light_green = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
     fill_green = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
-    fill_light_orange = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")  # Светло-оранжевый
+    fill_light_orange = PatternFill(start_color="FFA07A", end_color="FFA07A", fill_type="solid")
 
-    # Создаем словарь для быстрого поиска строк в table1 по значению ключевого столбца
     table1_dict = table1.set_index(key_column).T.to_dict()
 
-    # Обход всех строк второй таблицы и сравнение с соответствующими строками первой таблицы
     for index, row in table2.iterrows():
         key_value = row[key_column]
         if key_value in table1_dict:
-            # Найдена строка с таким же ключевым значением, проверяем на изменения
             table1_row = table1_dict[key_value]
             differences = False
             for col_index, col_name in enumerate(table2.columns, start=1):
@@ -87,7 +78,6 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
                     if new_sheet.cell(row=index + 2, column=col_index).fill != fill_green:
                         new_sheet.cell(row=index + 2, column=col_index).fill = fill_light_green
         else:
-            # Строка с таким ключевым значением отсутствует в table1, выделяем всю строку
             if save_option in ["Все строки", "Только новые строки", "Новые/измененные строки"]:
                 for col_index, col_name in enumerate(table2.columns, start=1):
                     new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
@@ -100,42 +90,34 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
                 if cell.value is None:
                     cell.value = row[col_name]
 
-    # Удаление пустых строк
     remove_empty_rows(new_sheet)
 
-    # Окрашиваем неучтенные столбцы в светло-оранжевый
     unused_columns1 = columns1 - columns2
     unused_columns2 = columns2 - columns1
 
-    # Определяем фактическое количество строк в новом файле
-    max_rows = new_sheet.max_row  # Получаем количество строк в new_sheet
+    max_rows = new_sheet.max_row
 
     for col_name in unused_columns1:
         if col_name in table2.columns:
             continue
         col_index = table2.columns.get_loc(col_name) + 1
-        for row in range(1, max_rows + 1):  # Включаем заголовок
+        for row in range(1, max_rows + 1):
             new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
 
     for col_name in unused_columns2:
         col_index = table2.columns.get_loc(col_name) + 1
-        for row in range(1, max_rows + 1):  # Включаем заголовок
+        for row in range(1, max_rows + 1):
             new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
 
-    # Генерация уникального имени файла для сохранения
     output_path = get_next_filename(output_path)
-
-    # Сохранение файла
     new_workbook.save(output_path)
 
-    # Отображение окна с сообщением об успешном сохранении
     show_success_window(output_path, root, position)
 
 def show_success_window(output_path, root, position):
     success_window = Toplevel(root)
     success_window.title("Успех")
     
-    # Центрирование окна "Успех" относительно главного окна
     root.update_idletasks()
     root_position_x = root.winfo_x()
     root_position_y = root.winfo_y()
@@ -151,36 +133,43 @@ def show_success_window(output_path, root, position):
     close_button.pack(pady=5)
 
 def open_output_folder(output_path):
-    os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
+    if platform.system() == "Windows":
+        os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
+    elif platform.system() == "Darwin":
+        os.system(f'open -R "{os.path.abspath(output_path)}"')
+    else:
+        os.system(f'xdg-open "{os.path.dirname(os.path.abspath(output_path))}"')
 
 def select_files(root):
-    position = [root.winfo_x(), root.winfo_y()]  # Получаем позицию главного окна
+    position = [root.winfo_x(), root.winfo_y()]
 
     def select_file1():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file1_entry.delete(0, END)
-            file1_entry.insert(0, filename)  # Сохраняем полный путь
+            file1_entry.insert(0, filename)
 
     def select_file2():
         filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
             file2_entry.delete(0, END)
-            file2_entry.insert(0, filename)  # Сохраняем полный путь
+            file2_entry.insert(0, filename)
 
     def select_output_folder():
         foldername = filedialog.askdirectory()
         if foldername:
             output_entry.delete(0, END)
-            # Установим полный путь с расширением .xlsx
             output_entry.insert(0, os.path.join(foldername, "differences.xlsx"))
         else:
-            output_entry.delete(0, END)
-            desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-            comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
-            if not os.path.exists(comparison_folder):
-                os.makedirs(comparison_folder)
-            output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
+            set_default_output_path()
+
+    def set_default_output_path():
+        desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
+        comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+        if not os.path.exists(comparison_folder):
+            os.makedirs(comparison_folder)
+        output_entry.delete(0, END)
+        output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
 
     def load_columns(file_path):
         try:
@@ -332,22 +321,8 @@ def show_developer_info(root, position):
     back_button = Button(developer_window, text="Назад", command=developer_window.destroy)
     back_button.pack()
 
-def main():
+if __name__ == "__main__":
     root = Tk()
-    root.title("Сравнение таблиц Excel")
-    root.geometry("700x475")
-
-    # Открытие окна по центру экрана
-    window_width = 700
-    window_height = 475
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    position_top = int(screen_height / 2 - window_height / 2)
-    position_right = int(screen_width / 2 - window_width / 2)
-    root.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
-    
+    root.geometry("600x400")
     select_files(root)
     root.mainloop()
-
-if __name__ == "__main__":
-    main()
