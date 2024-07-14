@@ -270,6 +270,12 @@ def select_files(root):
     output_entry = Entry(frame, width=50)
     output_entry.grid(row=2, column=1, padx=5, pady=5)
 
+    desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
+    comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+    if not os.path.exists(comparison_folder):
+        os.makedirs(comparison_folder)
+    output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
+
     output_button = Button(frame, text="Выбрать папку", command=select_output_folder)
     output_button.grid(row=2, column=2, padx=5, pady=5)
 
