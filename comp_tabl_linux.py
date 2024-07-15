@@ -66,6 +66,7 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     fill_light_green = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
     fill_green = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
     fill_light_orange = PatternFill(start_color="FFDAB9", end_color="FFDAB9", fill_type="solid")
+    fill_red = PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid")
 
     # Создаем словарь для быстрого поиска строк в table1 по значению ключевого столбца
     table1_dict = table1.set_index(key_column).T.to_dict()
@@ -99,6 +100,15 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
                 cell = new_sheet.cell(row=index + 2, column=col_index)
                 if cell.value is None:
                     cell.value = row[col_name]
+    
+    if save_option == "Отсутствующие строки из первой таблицы":
+        for index, row in table1.iterrows():
+            key_value = row[key_column]
+            if key_value not in table2[key_column].values:
+                for col_index, col_name in enumerate(table1.columns, start=1):
+                    new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
+                    new_sheet.cell(row=index + 2, column=col_index).fill = fill_red
+
 
     # Удаление пустых строк
     remove_empty_rows(new_sheet)
@@ -108,7 +118,7 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     unused_columns2 = columns2 - columns1
 
     # Определяем фактическое количество строк в новом файле
-    max_rows = new_sheet.max_row  # Получаем количество строк в new_sheet
+    max_rows = new_sheet.max_row # Получаем количество строк в new_sheet
 
     for col_name in unused_columns1:
         if col_name in table2.columns:
@@ -308,6 +318,9 @@ def select_files(root):
     save_radio4 = Radiobutton(frame, text="Новые+измененные строки", variable=save_option_var, value="Новые/измененные строки")
     save_radio4.grid(row=7, column=1, columnspan=2, padx=5, pady=5, sticky=W)
 
+    save_radio5 = Radiobutton(frame, text="Отсутствующие строки из первой таблицы", variable=save_option_var, value="Отсутствующие строки из первой таблицы")
+    save_radio5.grid(row=8, column=1, columnspan=2, padx=5, pady=5, sticky=W)
+
     start_button = Button(root, text="Далее", command=show_columns_selection, width=20)
     start_button.pack(pady=10, padx=10)
 
@@ -315,7 +328,7 @@ def select_files(root):
     developer_button.pack(pady=10, padx=10)
 
     save_label = Label(frame, text="© 3МН")
-    save_label.grid(row=8, column=2, sticky=E, pady=10)
+    save_label.grid(row=9, column=2, sticky=E, pady=10)
 
 # О разработчике
 def show_developer_info(root, position):
@@ -346,11 +359,11 @@ def show_developer_info(root, position):
 if __name__ == "__main__":
     root = Tk()
     root.title("Сравнение таблиц Excel")
-    root.geometry("910x490")
+    root.geometry("910x510")
 
     # Открытие окна по центру экрана
     window_width = 910
-    window_height = 490
+    window_height = 510
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     position_top = int(screen_height / 2 - window_height / 2)
