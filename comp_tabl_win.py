@@ -135,59 +135,52 @@ def show_success_window(output_path, root, position):
     success_window = Toplevel(root)
     success_window.title("Успех")
     
-    # Добавляем текст для отображения
-    label = Label(success_window, text=f"Результаты сравнения сохранены в файл:\n{output_path}")
-    label.pack(padx=10, pady=10)
-
-    success_window.update_idletasks()
-    width = success_window.winfo_width()
+    root.update_idletasks()
     root_position_x = root.winfo_x()
     root_position_y = root.winfo_y()
-    success_window.geometry(f"{width}x150+{root_position_x}+{root_position_y}")
+    success_window.geometry(f"400x150+{root_position_x}+{root_position_y}")
+    
+    label = Label(success_window, text=f"Результаты сравнения сохранены в файл:\n{output_path}")
+    label.pack(pady=10)
     
     open_folder_button = Button(success_window, text="Открыть папку с файлом", command=lambda: open_output_folder(output_path))
     open_folder_button.pack(pady=5)
-
+    
     close_button = Button(success_window, text="Готово", command=success_window.destroy)
     close_button.pack(pady=5)
-
+   
     success_window.transient(root)
     success_window.grab_set()
     success_window.focus_set()
     success_window.wait_window(success_window)
 
 def open_output_folder(output_path):
-    os.system(f'xdg-open "{os.path.dirname(os.path.abspath(output_path))}"')
+    os.system(f'explorer /select,"{os.path.abspath(output_path)}"')
 
 def select_files(root):
-    position = [root.winfo_x(), root.winfo_y()]
+    position = [root.winfo_x(), root.winfo_y()]  # Получаем позицию главного окна
 
     def select_file1():
-        filename = filedialog.askopenfilename(filetypes=[("Все файлы", "*.*")])
+        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
-            if filename.endswith(('.xlsx', '.xls')) or (".xlsx" in filename or ".xls" in filename):
-                file1_entry.delete(0, END)
-                file1_entry.insert(0, filename)  # Сохраняем полный путь
-            else:
-                messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
+            file1_entry.delete(0, END)
+            file1_entry.insert(0, filename)  # Сохраняем полный путь
 
     def select_file2():
-        filename = filedialog.askopenfilename(filetypes=[("Все файлы", "*.*")])
+        filename = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx;*.xls")])
         if filename:
-            if filename.endswith(('.xlsx', '.xls')) or (".xlsx" in filename or ".xls" in filename):
-                file2_entry.delete(0, END)
-                file2_entry.insert(0, filename)  # Сохраняем полный путь
-            else:
-                messagebox.showerror("Ошибка", "Пожалуйста, выберите файл с расширением .xlsx или .xls")
+            file2_entry.delete(0, END)
+            file2_entry.insert(0, filename)  # Сохраняем полный путь
 
     def select_output_folder():
         foldername = filedialog.askdirectory()
         if foldername:
             output_entry.delete(0, END)
+            # Установим полный путь с расширением .xlsx
             output_entry.insert(0, os.path.join(foldername, "differences.xlsx"))
         else:
             output_entry.delete(0, END)
-            desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
+            desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
             comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
             if not os.path.exists(comparison_folder):
                 os.makedirs(comparison_folder)
@@ -272,7 +265,7 @@ def select_files(root):
     output_entry = Entry(frame, width=50)
     output_entry.grid(row=2, column=1, padx=5, pady=5)
 
-    desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
+    desktop = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
     comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
     if not os.path.exists(comparison_folder):
         os.makedirs(comparison_folder)
@@ -326,7 +319,7 @@ def show_developer_info(root, position):
     root.update_idletasks()
     root_position_x = root.winfo_x()
     root_position_y = root.winfo_y()
-    developer_window.geometry(f"600x150+{root_position_x}+{root_position_y}")
+    developer_window.geometry(f"500x150+{root_position_x}+{root_position_y}")
     
     label = Label(developer_window, text="Программный продукт был разработан для облегчения Вашей работы", padx=10, pady=5)
     label.pack()
@@ -343,19 +336,22 @@ def show_developer_info(root, position):
     back_button = Button(developer_window, text="Назад", command=developer_window.destroy)
     back_button.pack()
 
-if __name__ == "__main__":
+def main():
     root = Tk()
     root.title("Сравнение таблиц Excel")
-    root.geometry("910x490")
+    root.geometry("700x475")
 
     # Открытие окна по центру экрана
-    window_width = 910
-    window_height = 490
+    window_width = 700
+    window_height = 475
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     position_top = int(screen_height / 2 - window_height / 2)
     position_right = int(screen_width / 2 - window_width / 2)
     root.geometry(f'{window_width}x{window_height}+{position_right}+{position_top}')
+    
     select_files(root)
     root.mainloop()
-    initialize_output_folder()
+
+if __name__ == "__main__":
+    main()
