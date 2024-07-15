@@ -188,7 +188,7 @@ def select_files(root):
         else:
             output_entry.delete(0, END)
             desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
-            comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+            comparison_folder = os.path.join(desktop, "Сравнение таблиц")
             if not os.path.exists(comparison_folder):
                 os.makedirs(comparison_folder)
             output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
@@ -273,7 +273,7 @@ def select_files(root):
     output_entry.grid(row=2, column=1, padx=5, pady=5)
 
     desktop = os.path.join(os.path.join(os.environ['HOME']), 'Desktop')
-    comparison_folder = os.path.join(desktop, "Сравнение выгрузок")
+    comparison_folder = os.path.join(desktop, "Сравнение таблиц")
     if not os.path.exists(comparison_folder):
         os.makedirs(comparison_folder)
     output_entry.insert(0, os.path.join(comparison_folder, "differences.xlsx"))
