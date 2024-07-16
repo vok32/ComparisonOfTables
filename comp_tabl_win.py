@@ -48,9 +48,12 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     columns1 = set(table1.columns)
     columns2 = set(table2.columns)
 
+    # Определяем общие столбцы
+    common_columns = columns1 & columns2
+
     # Проверка наличия одинаковых столбцов
     if columns1 != columns2:
-        custom_messagebox("Ошибка", "Таблицы имеют разные столбцы.\nБудут использованы только общие столбцы.\n\nОтсылка на кнопку отклонить в 1C.", root)
+        custom_messagebox("Ошибка", "Таблицы имеют разные столбцы.\nБудут использованы только общие столбцы для сравнения.\n\nОтсылка на кнопку отклонить в 1C.", root)
 
     # Создаем новый файл для сохранения результатов
     new_workbook = Workbook()
@@ -78,10 +81,10 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
             # Найдена строка с таким же ключевым значением, проверяем на изменения
             table1_row = table1_dict[key_value]
             differences = False
-            for col_index, col_name in enumerate(table2.columns, start=1):
+            for col_index, col_name in enumerate(common_columns, start=1):
                 if col_name in table1_row and row[col_name] != table1_row[col_name]:
                     differences = True
-                    new_sheet.cell(row=index + 2, column=col_index).fill = fill_green
+                    new_sheet.cell(row=index + 2, column=table2.columns.get_loc(col_name) + 1).fill = fill_green
             if differences and (save_option in ["Все строки", "Только измененные строки", "Новые/измененные строки"]):
                 for col_index, col_name in enumerate(table2.columns, start=1):
                     new_sheet.cell(row=index + 2, column=col_index).value = row[col_name]
@@ -118,17 +121,22 @@ def compare_excel_tables(file1_path, file2_path, output_path, save_option, key_c
     # Определяем фактическое количество строк в новом файле
     max_rows = new_sheet.max_row  # Получаем количество строк в new_sheet
 
-    for col_name in unused_columns1:
-        if col_name in table2.columns:
-            continue
-        col_index = table2.columns.get_loc(col_name) + 1
-        for row in range(1, max_rows + 1):  # Включаем заголовок
-            new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
+    # Окрашиваем неучтенные столбцы в светло-оранжевый
+    # for col_name in unused_columns1:
+    #     # Если столбец отсутствует во второй таблице
+    #     if col_name not in table2.columns:
+    #         # Ищем индекс по названию в первой таблице
+    #         col_index = list(table1.columns).index(col_name) + 1
+    #         for row in range(1, max_rows + 1):  # Включаем заголовок
+    #             new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
 
     for col_name in unused_columns2:
-        col_index = table2.columns.get_loc(col_name) + 1
-        for row in range(1, max_rows + 1):  # Включаем заголовок
-            new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
+        # Если столбец отсутствует в первой таблице
+        if col_name not in table1.columns:
+            # Ищем индекс по названию во второй таблице
+            col_index = list(table2.columns).index(col_name) + 1
+            for row in range(1, max_rows + 1):  # Включаем заголовок
+                new_sheet.cell(row=row, column=col_index).fill = fill_light_orange
 
     # Генерация уникального имени файла для сохранения
     output_path = get_next_filename(output_path)
@@ -315,8 +323,14 @@ def select_files(root):
     start_button = Button(root, text="Далее", command=show_columns_selection, width=20)
     start_button.pack(pady=10, padx=10)
 
-    developer_button = Button(root, text="О разработчике", command=lambda: show_developer_info(root, position), width=20)
-    developer_button.pack(pady=10, padx=10)
+    button_frame = Frame(root)
+    button_frame.pack(pady=10)
+
+    developer_button = Button(button_frame, text="О разработчике", command=lambda: show_developer_info(root, position), width=20)
+    developer_button.pack(padx=10, side=LEFT)
+
+    app_info_button = Button(button_frame, text="О приложении", command=lambda: show_app_info(root, position), width=20)
+    app_info_button.pack(padx=10, side=LEFT)
 
     save_label = Label(frame, text="© 3МН")
     save_label.grid(row=9, column=2, sticky=E, pady=10)
@@ -346,6 +360,36 @@ def show_developer_info(root, position):
 
     back_button = Button(developer_window, text="Назад", command=developer_window.destroy)
     back_button.pack()
+
+def show_app_info(root, position):
+    info_message = (
+        "В выборе столбца для сравнения желательно НЕ использовать дубликаты.\n"
+        "Могут возникнуть ошибки в сравнении.\n\n"
+        "Цвета выделения:\n"
+        "    Новые строки: желтый\n"
+        "    Строки в которой произошли измненения: светло-зеленый\n"
+        "    Измененная ячейка: зеленый\n"
+        "    Отсутствующие строки из первой таблицы: красный\n"
+        "    Неучтенные столбцы: светло-оранжевый"
+    )
+    
+    # Создание окна с информацией
+    info_window = Toplevel(root)
+    info_window.title("Информация о приложении")
+    
+    # Получение позиции главного окна
+    root_position_x = root.winfo_x()
+    root_position_y = root.winfo_y()
+    info_window.geometry(f"500x210+{root_position_x}+{root_position_y}")  # Размеры и позиция
+
+    # Добавление метки с сообщением
+    message_label = Label(info_window, text=info_message, justify="left")
+    message_label.pack(pady=10, padx=10)
+
+    # Кнопка закрытия окна
+    close_button = Button(info_window, text="Закрыть", command=info_window.destroy)
+    close_button.pack(pady=10)
+
 
 def main():
     root = Tk()
