@@ -14,15 +14,14 @@ from tkinter import (
     BOTH,
     E,
     END,
-    EXTENDED,
     LEFT,
     W,
     Button,
     Entry,
     Frame,
     Label,
-    Listbox,
     Radiobutton,
+    BooleanVar,
     StringVar,
     Tk,
     Toplevel,
@@ -495,7 +494,7 @@ def select_files(root: Tk) -> None:
 
         window = Toplevel(root)
         window.title("Настройка сравнения")
-        window_height = 370 if save_option == SAVE_SUMMARY else 190
+        window_height = (310 + min(len(only_file1_columns), 8) * 28) if save_option == SAVE_SUMMARY else 190
         place_near_root(window, root, 500, window_height)
         window.transient(root)
 
@@ -514,7 +513,7 @@ def select_files(root: Tk) -> None:
         if common_columns:
             key_column_combo.current(0)
 
-        carry_columns_listbox: Listbox | None = None
+        carry_column_vars: list[tuple[Hashable, BooleanVar]] = []
         if save_option == SAVE_SUMMARY:
             Label(
                 window,
@@ -526,18 +525,21 @@ def select_files(root: Tk) -> None:
                 wraplength=460,
             ).pack(pady=(14, 6), padx=12)
 
-            carry_columns_listbox = Listbox(
+            carry_columns_frame = ttk.LabelFrame(
                 window,
-                width=52,
-                height=min(max(len(only_file1_columns), 3), 8),
-                selectmode=EXTENDED,
-                exportselection=False,
+                text="Столбцы для переноса",
+                padding=(10, 6),
             )
-            carry_columns_listbox.pack(pady=4, padx=12)
+            carry_columns_frame.pack(fill="x", pady=4, padx=18)
+
             for column in only_file1_columns:
-                carry_columns_listbox.insert(END, str(column))
-            # По умолчанию предлагаем перенести все ручные поля; лишнее можно снять.
-            carry_columns_listbox.selection_set(0, END)
+                selected_var = BooleanVar(value=True)
+                ttk.Checkbutton(
+                    carry_columns_frame,
+                    text=str(column),
+                    variable=selected_var,
+                ).pack(anchor="w", pady=2)
+                carry_column_vars.append((column, selected_var))
 
         def start_comparison() -> None:
             selected_index = key_column_combo.current()
@@ -551,18 +553,18 @@ def select_files(root: Tk) -> None:
 
             selected_carry_columns: list[Hashable] = []
             if save_option == SAVE_SUMMARY:
-                assert carry_columns_listbox is not None
-                selected_indices = carry_columns_listbox.curselection()
-                if not selected_indices:
+                selected_carry_columns = [
+                    column
+                    for column, selected_var in carry_column_vars
+                    if selected_var.get()
+                ]
+                if not selected_carry_columns:
                     messagebox.showerror(
                         "Ошибка",
-                        "Выберите хотя бы один столбец для переноса в сводку.",
+                        "Поставьте галочку хотя бы у одного столбца для переноса в сводку.",
                         parent=window,
                     )
                     return
-                selected_carry_columns = [
-                    only_file1_columns[index] for index in selected_indices
-                ]
 
             root.config(cursor="watch")
             window.config(cursor="watch")
