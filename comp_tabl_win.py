@@ -363,20 +363,44 @@ def compare_excel_tables(
     return final_output_path, only_table1, only_table2
 
 
-def place_near_root(window: Toplevel, root: Tk, width: int, height: int) -> None:
-    root.update_idletasks()
-    window.geometry(f"{width}x{height}+{root.winfo_x()}+{root.winfo_y()}")
+def center_window(
+    window: Tk | Toplevel,
+    parent: Tk | Toplevel | None = None,
+) -> None:
+    """Центрирует окно по экрану или относительно родительского окна."""
+    window.update_idletasks()
+    width = window.winfo_reqwidth()
+    height = window.winfo_reqheight()
+
+    if parent is None:
+        x = (window.winfo_screenwidth() - width) // 2
+        y = (window.winfo_screenheight() - height) // 2
+    else:
+        parent.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width() - width) // 2
+        y = parent.winfo_rooty() + (parent.winfo_height() - height) // 2
+
+    # Размер остаётся автоматическим: задаём только положение окна.
+    window.geometry(f"+{max(0, x)}+{max(0, y)}")
+
+
+def center_after_layout(
+    window: Tk | Toplevel,
+    parent: Tk | Toplevel | None = None,
+) -> None:
+    """Центрирует окно после расчёта размеров всех элементов интерфейса."""
+    window.after_idle(lambda: center_window(window, parent))
 
 
 def custom_messagebox(title: str, message: str, root: Tk) -> None:
     window = Toplevel(root)
     window.title(title)
-    place_near_root(window, root, 450, 170)
 
     Label(window, text=message, justify="left", wraplength=420).pack(pady=12, padx=12)
     Button(window, text="Принять", command=window.destroy).pack(pady=5)
 
     window.transient(root)
+    center_after_layout(window, root)
     window.grab_set()
     window.focus_set()
     window.wait_window()
@@ -385,7 +409,6 @@ def custom_messagebox(title: str, message: str, root: Tk) -> None:
 def show_success_window(output_path: Path, root: Tk) -> None:
     success_window = Toplevel(root)
     success_window.title("Успех")
-    place_near_root(success_window, root, 500, 170)
 
     Label(
         success_window,
@@ -401,6 +424,7 @@ def show_success_window(output_path: Path, root: Tk) -> None:
     Button(success_window, text="Готово", command=success_window.destroy).pack(pady=5)
 
     success_window.transient(root)
+    center_after_layout(success_window, root)
     success_window.grab_set()
     success_window.focus_set()
     success_window.wait_window()
@@ -494,8 +518,6 @@ def select_files(root: Tk) -> None:
 
         window = Toplevel(root)
         window.title("Настройка сравнения")
-        window_height = (310 + min(len(only_file1_columns), 8) * 28) if save_option == SAVE_SUMMARY else 190
-        place_near_root(window, root, 500, window_height)
         window.transient(root)
 
         Label(
@@ -612,6 +634,7 @@ def select_files(root: Tk) -> None:
             show_success_window(saved_path, root)
 
         Button(window, text="Создать файл", command=start_comparison).pack(pady=12)
+        center_after_layout(window, root)
 
     frame = Frame(root, padx=10, pady=10)
     frame.pack(padx=10, pady=10, fill=BOTH)
@@ -719,7 +742,6 @@ def select_files(root: Tk) -> None:
 def show_developer_info(root: Tk) -> None:
     developer_window = Toplevel(root)
     developer_window.title("О разработчике")
-    place_near_root(developer_window, root, 520, 180)
     developer_window.transient(root)
 
     Label(
@@ -747,6 +769,7 @@ def show_developer_info(root: Tk) -> None:
         pady=5,
     ).pack()
     Button(developer_window, text="Назад", command=developer_window.destroy).pack()
+    center_after_layout(developer_window, root)
 
 
 def show_app_info(root: Tk) -> None:
@@ -767,28 +790,19 @@ def show_app_info(root: Tk) -> None:
 
     info_window = Toplevel(root)
     info_window.title("Информация о приложении")
-    place_near_root(info_window, root, 600, 330)
     info_window.transient(root)
 
     Label(info_window, text=info_message, justify="left").pack(pady=10, padx=10)
     Button(info_window, text="Закрыть", command=info_window.destroy).pack(pady=10)
+    center_after_layout(info_window, root)
 
 
 def main() -> None:
     root = Tk()
     root.title(APP_TITLE)
 
-    window_width = 760
-    window_height = 590
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    position_top = int(screen_height / 2 - window_height / 2)
-    position_right = int(screen_width / 2 - window_width / 2)
-    root.geometry(
-        f"{window_width}x{window_height}+{position_right}+{position_top}"
-    )
-
     select_files(root)
+    center_after_layout(root)
     root.mainloop()
 
 
