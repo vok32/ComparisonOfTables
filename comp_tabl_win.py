@@ -14,12 +14,14 @@ from tkinter import (
     BOTH,
     E,
     END,
+    EXTENDED,
     LEFT,
     W,
     Button,
     Entry,
     Frame,
     Label,
+    Listbox,
     Radiobutton,
     StringVar,
     Tk,
@@ -39,6 +41,7 @@ SAVE_NEW = "Только новые строки"
 SAVE_CHANGED = "Только измененные строки"
 SAVE_NEW_CHANGED = "Новые/измененные строки"
 SAVE_MISSING = "Отсутствующие строки из первой таблицы"
+SAVE_SUMMARY = "Для сводки"
 
 SAVE_OPTIONS = (
     SAVE_ALL,
@@ -46,6 +49,7 @@ SAVE_OPTIONS = (
     SAVE_CHANGED,
     SAVE_NEW_CHANGED,
     SAVE_MISSING,
+    SAVE_SUMMARY,
 )
 
 FILL_YELLOW = PatternFill(start_color="FFEB99", end_color="FFEB99", fill_type="solid")
@@ -192,6 +196,7 @@ def compare_excel_tables(
     output_path: str | Path,
     save_option: str,
     key_column: Hashable,
+    carry_columns: list[Hashable] | None = None,
 ) -> tuple[Path, list[Hashable], list[Hashable]]:
     """
     Сравнивает первую (старую) и вторую (новую) таблицы.
@@ -223,6 +228,29 @@ def compare_excel_tables(
     only_table1 = [column for column in columns1 if column not in columns2_set]
     only_table2 = [column for column in columns2 if column not in columns1_set]
 
+    selected_carry_columns = list(carry_columns or [])
+    if save_option == SAVE_SUMMARY:
+        if not selected_carry_columns:
+            raise ComparisonError(
+                "Для режима «Для сводки» выберите хотя бы один столбец "
+                "из первой таблицы."
+            )
+
+        invalid_columns = [
+            column
+            for column in selected_carry_columns
+            if column not in only_table1
+        ]
+        if invalid_columns:
+            raise ComparisonError(
+                "В сводку можно переносить только столбцы, которые есть "
+                "в первой таблице и отсутствуют во второй:\n• "
+                + "\n• ".join(map(str, invalid_columns))
+            )
+
+        # Не допускаем повторов, сохраняя выбранный пользователем порядок.
+        selected_carry_columns = list(dict.fromkeys(selected_carry_columns))
+
     table1_by_key = table1.set_index(key_column, drop=False)
     table2_by_key = table2.set_index(key_column, drop=False)
     keys1 = set(table1_by_key.index)
@@ -235,14 +263,21 @@ def compare_excel_tables(
     if save_option == SAVE_MISSING:
         output_columns = columns1
         unused_columns = only_table1
+    elif save_option == SAVE_SUMMARY:
+        output_columns = columns2 + selected_carry_columns
+        unused_columns = only_table2
     else:
         output_columns = columns2
         unused_columns = only_table2
 
     sheet.append([excel_value(column) for column in output_columns])
 
-    def append_row(row: pd.Series, status: str, changed_columns: set[Hashable] | None = None) -> None:
-        sheet.append([excel_value(row[column]) for column in output_columns])
+    def append_row(
+        row_values: pd.Series | dict[Hashable, Any],
+        status: str,
+        changed_columns: set[Hashable] | None = None,
+    ) -> None:
+        sheet.append([excel_value(row_values.get(column)) for column in output_columns])
         output_row = sheet.max_row
 
         if status == "new":
@@ -265,8 +300,20 @@ def compare_excel_tables(
             key_value = row[key_column]
 
             if key_value not in keys1:
-                if save_option in {SAVE_ALL, SAVE_NEW, SAVE_NEW_CHANGED}:
-                    append_row(row, "new")
+                if save_option in {
+                    SAVE_ALL,
+                    SAVE_NEW,
+                    SAVE_NEW_CHANGED,
+                    SAVE_SUMMARY,
+                }:
+                    if save_option == SAVE_SUMMARY:
+                        summary_row = row.to_dict()
+                        summary_row.update(
+                            {column: None for column in selected_carry_columns}
+                        )
+                        append_row(summary_row, "new")
+                    else:
+                        append_row(row, "new")
                 continue
 
             old_row = table1_by_key.loc[key_value]
@@ -276,7 +323,20 @@ def compare_excel_tables(
                 if not values_equal(old_row[column], row[column])
             }
 
-            if changed_columns:
+            if save_option == SAVE_SUMMARY:
+                summary_row = row.to_dict()
+                summary_row.update(
+                    {
+                        column: old_row[column]
+                        for column in selected_carry_columns
+                    }
+                )
+                append_row(
+                    summary_row,
+                    "changed" if changed_columns else "unchanged",
+                    changed_columns,
+                )
+            elif changed_columns:
                 if save_option in {SAVE_ALL, SAVE_CHANGED, SAVE_NEW_CHANGED}:
                     append_row(row, "changed", changed_columns)
             elif save_option == SAVE_ALL:
@@ -287,6 +347,13 @@ def compare_excel_tables(
         column_number = output_columns.index(column) + 1
         for row_number in range(1, sheet.max_row + 1):
             sheet.cell(row=row_number, column=column_number).fill = FILL_LIGHT_ORANGE
+
+    # В режиме сводки оранжевым отмечаем только заголовки ручных полей.
+    # Так сохраняется цветовой статус новых и изменённых строк.
+    if save_option == SAVE_SUMMARY:
+        for column in selected_carry_columns:
+            column_number = output_columns.index(column) + 1
+            sheet.cell(row=1, column=column_number).fill = FILL_LIGHT_ORANGE
 
     format_sheet(sheet)
 
@@ -405,6 +472,9 @@ def select_files(root: Tk) -> None:
 
         columns2_set = set(columns_file2)
         common_columns = [column for column in columns_file1 if column in columns2_set]
+        only_file1_columns = [
+            column for column in columns_file1 if column not in columns2_set
+        ]
         if not common_columns:
             messagebox.showerror(
                 "Ошибка",
@@ -413,15 +483,26 @@ def select_files(root: Tk) -> None:
             )
             return
 
+        if save_option == SAVE_SUMMARY and not only_file1_columns:
+            messagebox.showerror(
+                "Ошибка",
+                "В первой таблице нет дополнительных столбцов, которых нет "
+                "во второй. Для такого набора файлов используйте режим "
+                "«Все строки».",
+                parent=root,
+            )
+            return
+
         window = Toplevel(root)
-        window.title("Выберите столбец для сравнения")
-        place_near_root(window, root, 450, 170)
+        window.title("Настройка сравнения")
+        window_height = 370 if save_option == SAVE_SUMMARY else 190
+        place_near_root(window, root, 500, window_height)
         window.transient(root)
 
         Label(
             window,
             text="Выберите общий уникальный столбец без пустых значений:",
-        ).pack(pady=10)
+        ).pack(pady=(12, 6))
 
         key_column_combo = ttk.Combobox(
             window,
@@ -433,6 +514,31 @@ def select_files(root: Tk) -> None:
         if common_columns:
             key_column_combo.current(0)
 
+        carry_columns_listbox: Listbox | None = None
+        if save_option == SAVE_SUMMARY:
+            Label(
+                window,
+                text=(
+                    "Выберите поля из первой таблицы, которые нужно перенести "
+                    "в сводку.\nДля новых строк эти ячейки останутся пустыми."
+                ),
+                justify="left",
+                wraplength=460,
+            ).pack(pady=(14, 6), padx=12)
+
+            carry_columns_listbox = Listbox(
+                window,
+                width=52,
+                height=min(max(len(only_file1_columns), 3), 8),
+                selectmode=EXTENDED,
+                exportselection=False,
+            )
+            carry_columns_listbox.pack(pady=4, padx=12)
+            for column in only_file1_columns:
+                carry_columns_listbox.insert(END, str(column))
+            # По умолчанию предлагаем перенести все ручные поля; лишнее можно снять.
+            carry_columns_listbox.selection_set(0, END)
+
         def start_comparison() -> None:
             selected_index = key_column_combo.current()
             if selected_index < 0:
@@ -442,6 +548,22 @@ def select_files(root: Tk) -> None:
                 return
 
             key_column = common_columns[selected_index]
+
+            selected_carry_columns: list[Hashable] = []
+            if save_option == SAVE_SUMMARY:
+                assert carry_columns_listbox is not None
+                selected_indices = carry_columns_listbox.curselection()
+                if not selected_indices:
+                    messagebox.showerror(
+                        "Ошибка",
+                        "Выберите хотя бы один столбец для переноса в сводку.",
+                        parent=window,
+                    )
+                    return
+                selected_carry_columns = [
+                    only_file1_columns[index] for index in selected_indices
+                ]
+
             root.config(cursor="watch")
             window.config(cursor="watch")
             root.update_idletasks()
@@ -453,6 +575,7 @@ def select_files(root: Tk) -> None:
                     output_path,
                     save_option,
                     key_column,
+                    selected_carry_columns,
                 )
             except ComparisonError as exc:
                 messagebox.showerror("Ошибка", str(exc), parent=window)
@@ -486,7 +609,7 @@ def select_files(root: Tk) -> None:
 
             show_success_window(saved_path, root)
 
-        Button(window, text="Начать сравнение", command=start_comparison).pack(pady=10)
+        Button(window, text="Создать файл", command=start_comparison).pack(pady=12)
 
     frame = Frame(root, padx=10, pady=10)
     frame.pack(padx=10, pady=10, fill=BOTH)
@@ -547,11 +670,12 @@ def select_files(root: Tk) -> None:
     save_option_var = StringVar(value=SAVE_ALL)
 
     for row_number, option in enumerate(SAVE_OPTIONS, start=4):
-        label = (
-            "Строки из первой таблицы, отсутствующие во второй"
-            if option == SAVE_MISSING
-            else option.replace("Новые/измененные", "Новые + изменённые")
-        )
+        if option == SAVE_MISSING:
+            label = "Строки из первой таблицы, отсутствующие во второй"
+        elif option == SAVE_SUMMARY:
+            label = "Для сводки — все строки + ручные поля из первого файла"
+        else:
+            label = option.replace("Новые/измененные", "Новые + изменённые")
         Radiobutton(
             frame,
             text=label,
@@ -585,7 +709,9 @@ def select_files(root: Tk) -> None:
         width=20,
     ).pack(padx=10, side=LEFT)
 
-    Label(frame, text="© 3МН").grid(row=9, column=2, sticky=E, pady=10)
+    Label(frame, text="© 3МН").grid(
+        row=4 + len(SAVE_OPTIONS), column=2, sticky=E, pady=10
+    )
 
 
 def show_developer_info(root: Tk) -> None:
@@ -625,17 +751,21 @@ def show_app_info(root: Tk) -> None:
     info_message = (
         "Первая таблица считается исходной, вторая — новой.\n"
         "Ключевой столбец должен быть общим, уникальным и без пустых значений.\n\n"
+        "Режим «Для сводки» сохраняет все строки новой таблицы и переносит "
+        "выбранные ручные поля из первой таблицы. Для новых записей эти "
+        "поля остаются пустыми.\n\n"
         "Цвета выделения:\n"
         "    Новые строки: жёлтый\n"
         "    Изменённая строка: светло-зелёный\n"
         "    Изменённая ячейка: зелёный\n"
         "    Строки из первой таблицы, отсутствующие во второй: красный\n"
-        "    Столбцы, не участвовавшие в сравнении: светло-оранжевый"
+        "    Столбцы, не участвовавшие в сравнении: светло-оранжевый\n"
+        "    Заголовки ручных полей сводки: светло-оранжевый"
     )
 
     info_window = Toplevel(root)
     info_window.title("Информация о приложении")
-    place_near_root(info_window, root, 560, 260)
+    place_near_root(info_window, root, 600, 330)
     info_window.transient(root)
 
     Label(info_window, text=info_message, justify="left").pack(pady=10, padx=10)
@@ -647,7 +777,7 @@ def main() -> None:
     root.title(APP_TITLE)
 
     window_width = 760
-    window_height = 540
+    window_height = 590
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
     position_top = int(screen_height / 2 - window_height / 2)
