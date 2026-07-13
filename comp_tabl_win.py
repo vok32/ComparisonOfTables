@@ -36,10 +36,10 @@ DEFAULT_OUTPUT_NAME = "differences.xlsx"
 OUTPUT_SHEET_TITLE = "Результаты сравнения"
 
 SAVE_ALL = "Все строки"
-SAVE_NEW = "Только новые строки"
-SAVE_CHANGED = "Только измененные строки"
+SAVE_NEW = "Новые строки"
+SAVE_CHANGED = "Измененные строки"
 SAVE_NEW_CHANGED = "Новые/измененные строки"
-SAVE_MISSING = "Отсутствующие строки из первой таблицы"
+SAVE_MISSING = "Потеряшки"
 SAVE_SUMMARY = "Для сводки"
 
 SAVE_OPTIONS = (
@@ -673,9 +673,9 @@ def select_files(root: Tk) -> None:
 
     for row_number, option in enumerate(SAVE_OPTIONS, start=4):
         if option == SAVE_MISSING:
-            label = "Строки из первой таблицы, отсутствующие во второй"
+            label = "Потеряшки"
         elif option == SAVE_SUMMARY:
-            label = "Для сводки — все строки + ручные поля из первого файла"
+            label = "Для сводки (все + комментарии)"
         else:
             label = option.replace("Новые/измененные", "Новые + изменённые")
         Radiobutton(
