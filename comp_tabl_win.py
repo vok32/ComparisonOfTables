@@ -304,11 +304,17 @@ def changed_columns_for_rows(
     fio_column: Hashable,
     direction_column: Hashable,
     contract_column: Hashable | None,
+    ignored_change_columns: set[Hashable] | None = None,
 ) -> set[Hashable]:
     """Возвращает реально изменившиеся общие столбцы."""
     changed: set[Hashable] = set()
+    ignored = ignored_change_columns or set()
 
     for column in comparison_columns:
+        # Столбец продолжает участвовать в сопоставлении строк,
+        # но его отличие не считается изменением и не подсвечивается.
+        if column in ignored:
+            continue
         if column in {fio_column, direction_column}:
             if normalize_text(old_row[column]) != normalize_text(new_row[column]):
                 changed.add(column)
@@ -490,6 +496,7 @@ def compare_excel_tables(
     direction_column: Hashable,
     contract_column: Hashable | None = None,
     carry_columns: list[Hashable] | None = None,
+    ignored_change_columns: list[Hashable] | None = None,
 ) -> tuple[Path, list[Hashable], list[Hashable]]:
     """
     Сравнивает первую (старую) и вторую (новую) таблицы.
@@ -530,6 +537,16 @@ def compare_excel_tables(
     common_columns = [column for column in columns2 if column in columns1_set]
     only_table1 = [column for column in columns1 if column not in columns2_set]
     only_table2 = [column for column in columns2 if column not in columns1_set]
+
+    ignored_changes = set(ignored_change_columns or [])
+    invalid_ignored_columns = [
+        column for column in ignored_changes if column not in common_columns
+    ]
+    if invalid_ignored_columns:
+        raise ComparisonError(
+            "Исключить из проверки изменений можно только общие столбцы двух таблиц:\n• "
+            + "\n• ".join(map(str, invalid_ignored_columns))
+        )
 
     selected_carry_columns = list(carry_columns or [])
     if save_option == SAVE_SUMMARY:
@@ -627,6 +644,7 @@ def compare_excel_tables(
                 fio_column,
                 direction_column,
                 contract_column,
+                ignored_changes,
             )
 
             result_row = new_row.to_dict()
@@ -891,8 +909,8 @@ def select_files(root: Tk) -> None:
         )
         direction_index = find_suggested_column_index(
             common_columns,
-            ("Направление", "Направление подготовки", "Специальность"),
-            ("направлен", "специальн"),
+            ("Конкурсная группа", "Направление", "Направление подготовки", "Специальность"),
+            ("конкурсн", "направлен", "специальн"),
         )
         contract_index = find_suggested_column_index(
             common_columns,
@@ -906,9 +924,40 @@ def select_files(root: Tk) -> None:
             if direction_index is not None
             else (1 if len(common_columns) > 1 else 0)
         )
-        contract_combo.current(
-            contract_index + 1 if contract_index is not None else 0
+        contract_combo.current(0)
+
+        Label(
+            window,
+            text=(
+                "При необходимости отметьте столбцы, изменения в которых не нужно "
+                "подсвечивать. Значения в результате всё равно будут взяты из новой таблицы."
+            ),
+            justify="left",
+            wraplength=520,
+        ).pack(pady=(12, 4), padx=18)
+
+        ignore_columns_frame = ttk.LabelFrame(
+            window,
+            text="Не учитывать при определении изменений",
+            padding=(10, 6),
         )
+        ignore_columns_frame.pack(fill="x", pady=4, padx=18)
+
+        ignored_column_vars: list[tuple[Hashable, BooleanVar]] = []
+        for index, column in enumerate(common_columns):
+            ignored_var = BooleanVar(value=False)
+            ttk.Checkbutton(
+                ignore_columns_frame,
+                text=str(column),
+                variable=ignored_var,
+            ).grid(
+                row=index // 2,
+                column=index % 2,
+                sticky=W,
+                padx=(0, 18),
+                pady=2,
+            )
+            ignored_column_vars.append((column, ignored_var))
 
         carry_column_vars: list[tuple[Hashable, BooleanVar]] = []
         if save_option == SAVE_SUMMARY:
@@ -969,6 +1018,12 @@ def select_files(root: Tk) -> None:
             if contract_selected_index > 0:
                 contract_column = common_columns[contract_selected_index - 1]
 
+            ignored_change_columns = [
+                column
+                for column, ignored_var in ignored_column_vars
+                if ignored_var.get()
+            ]
+
             selected_carry_columns: list[Hashable] = []
             if save_option == SAVE_SUMMARY:
                 selected_carry_columns = [
@@ -998,6 +1053,7 @@ def select_files(root: Tk) -> None:
                     direction_column,
                     contract_column,
                     selected_carry_columns,
+                    ignored_change_columns,
                 )
             except ComparisonError as exc:
                 messagebox.showerror("Ошибка", str(exc), parent=window)
