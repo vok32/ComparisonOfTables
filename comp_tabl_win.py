@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Hashable
 
@@ -54,7 +55,6 @@ SAVE_OPTIONS = (
 FILL_YELLOW = PatternFill(start_color="FFEB99", end_color="FFEB99", fill_type="solid")
 FILL_LIGHT_GREEN = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
 FILL_GREEN = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
-FILL_LIGHT_ORANGE = PatternFill(start_color="FFDAB9", end_color="FFDAB9", fill_type="solid")
 FILL_RED = PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid")
 
 
@@ -86,13 +86,10 @@ def read_excel_table(file_path: str | Path) -> pd.DataFrame:
 
     suffix = path.suffix.lower()
     if suffix not in {".xlsx", ".xlsm", ".xls"}:
-        raise ComparisonError(
-            "Поддерживаются файлы .xlsx, .xlsm и .xls."
-        )
+        raise ComparisonError("Поддерживаются файлы .xlsx, .xlsm и .xls.")
 
     try:
         if suffix == ".xls":
-            # Для старого формата .xls pandas обычно использует пакет xlrd.
             return pd.read_excel(path)
         return pd.read_excel(path, engine="openpyxl")
     except ImportError as exc:
@@ -112,7 +109,14 @@ def is_missing(value: Any) -> bool:
         result = pd.isna(value)
     except (TypeError, ValueError):
         return False
-    return bool(result) if isinstance(result, (bool, type(pd.NA))) or not hasattr(result, "__len__") else False
+
+    if isinstance(result, bool):
+        return result
+
+    try:
+        return bool(result)
+    except (TypeError, ValueError):
+        return False
 
 
 def values_equal(left: Any, right: Any) -> bool:
@@ -138,37 +142,325 @@ def excel_value(value: Any) -> Any:
     return None if is_missing(value) else value
 
 
-def validate_key_column(
+def normalize_text(value: Any) -> str:
+    """Нормализация текста только для поиска соответствий, не для вывода."""
+    if is_missing(value):
+        return ""
+    text = str(value).replace("\xa0", " ")
+    text = " ".join(text.split())
+    return text.casefold()
+
+
+def normalize_contract(value: Any) -> str:
+    """Нормализует номер договора для дополнительного сопоставления."""
+    if is_missing(value):
+        return ""
+
+    # Excel иногда читает целые номера как 123.0.
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+
+    text = str(value).replace("\xa0", " ").strip()
+    text = re.sub(r"\s+", "", text)
+    return text.casefold()
+
+
+def soft_value(value: Any) -> Any:
+    """Нормализованное значение для оценки похожести строк."""
+    if is_missing(value):
+        return None
+
+    if isinstance(value, str):
+        return normalize_text(value)
+
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+
+    return value
+
+
+def soft_values_equal(left: Any, right: Any) -> bool:
+    return soft_value(left) == soft_value(right)
+
+
+def validate_match_columns(
     table1: pd.DataFrame,
     table2: pd.DataFrame,
-    key_column: Hashable,
+    fio_column: Hashable,
+    direction_column: Hashable,
+    contract_column: Hashable | None,
 ) -> None:
-    if key_column not in table1.columns or key_column not in table2.columns:
-        raise ComparisonError(
-            f"Ключевой столбец «{key_column}» должен присутствовать в обеих таблицах."
-        )
+    """Проверяет наличие ФИО/направления и допустимость выбранных столбцов."""
+    for column, label in (
+        (fio_column, "ФИО"),
+        (direction_column, "Направление"),
+    ):
+        if column not in table1.columns or column not in table2.columns:
+            raise ComparisonError(
+                f"Столбец для поля «{label}» должен присутствовать в обеих таблицах."
+            )
+
+    if fio_column == direction_column:
+        raise ComparisonError("Для ФИО и направления нужно выбрать разные столбцы.")
+
+    if contract_column is not None:
+        if contract_column not in table1.columns or contract_column not in table2.columns:
+            raise ComparisonError(
+                "Выбранный столбец номера договора должен присутствовать в обеих таблицах."
+            )
+        if contract_column in {fio_column, direction_column}:
+            raise ComparisonError(
+                "Столбец номера договора не должен совпадать с ФИО или направлением."
+            )
 
     problems: list[str] = []
     for number, table in ((1, table1), (2, table2)):
-        key_series = table[key_column]
-        empty_count = int(key_series.isna().sum())
-        duplicate_count = int(key_series.duplicated(keep=False).sum())
-
-        if empty_count:
+        fio_empty = int(table[fio_column].apply(lambda x: normalize_text(x) == "").sum())
+        direction_empty = int(
+            table[direction_column].apply(lambda x: normalize_text(x) == "").sum()
+        )
+        if fio_empty:
+            problems.append(f"в таблице {number} строк без ФИО: {fio_empty}")
+        if direction_empty:
             problems.append(
-                f"в таблице {number} пустых ключей: {empty_count}"
-            )
-        if duplicate_count:
-            problems.append(
-                f"в таблице {number} строк с повторяющимся ключом: {duplicate_count}"
+                f"в таблице {number} строк без направления: {direction_empty}"
             )
 
     if problems:
         raise ComparisonError(
-            "Нельзя однозначно сопоставить строки по выбранному столбцу:\n• "
+            "Для надёжного сопоставления ФИО и направление должны быть заполнены:\n• "
             + "\n• ".join(problems)
-            + "\n\nВыберите уникальный столбец без пустых значений."
         )
+
+
+def make_group_key(
+    row: pd.Series,
+    fio_column: Hashable,
+    direction_column: Hashable,
+) -> tuple[str, str]:
+    return (
+        normalize_text(row[fio_column]),
+        normalize_text(row[direction_column]),
+    )
+
+
+def contract_compatible(
+    old_row: pd.Series,
+    new_row: pd.Series,
+    contract_column: Hashable | None,
+) -> bool:
+    """
+    Если в обеих строках есть разные номера договоров, это разные записи.
+    Если хотя бы с одной стороны номер пустой, сопоставление разрешено.
+    """
+    if contract_column is None:
+        return True
+
+    old_contract = normalize_contract(old_row[contract_column])
+    new_contract = normalize_contract(new_row[contract_column])
+
+    if old_contract and new_contract and old_contract != new_contract:
+        return False
+    return True
+
+
+def row_difference_score(
+    old_row: pd.Series,
+    new_row: pd.Series,
+    comparison_columns: list[Hashable],
+    fio_column: Hashable,
+    direction_column: Hashable,
+    contract_column: Hashable | None,
+) -> int:
+    """Чем меньше число, тем больше строки похожи."""
+    score = 0
+
+    for column in comparison_columns:
+        if column in {fio_column, direction_column}:
+            continue
+
+        if contract_column is not None and column == contract_column:
+            old_contract = normalize_contract(old_row[column])
+            new_contract = normalize_contract(new_row[column])
+
+            # Пустой номер в новой выгрузке не считаем различием: он мог ещё не подгрузиться.
+            if not new_contract and old_contract:
+                continue
+
+            if old_contract != new_contract:
+                score += 2
+            continue
+
+        if not soft_values_equal(old_row[column], new_row[column]):
+            score += 1
+
+    return score
+
+
+def changed_columns_for_rows(
+    old_row: pd.Series,
+    new_row: pd.Series,
+    comparison_columns: list[Hashable],
+    fio_column: Hashable,
+    direction_column: Hashable,
+    contract_column: Hashable | None,
+) -> set[Hashable]:
+    """Возвращает реально изменившиеся общие столбцы."""
+    changed: set[Hashable] = set()
+
+    for column in comparison_columns:
+        if column in {fio_column, direction_column}:
+            if normalize_text(old_row[column]) != normalize_text(new_row[column]):
+                changed.add(column)
+            continue
+
+        if contract_column is not None and column == contract_column:
+            old_contract = normalize_contract(old_row[column])
+            new_contract = normalize_contract(new_row[column])
+
+            # Если номер был в старой выгрузке, а в новой временно пустой,
+            # это не считаем изменением.
+            if old_contract and not new_contract:
+                continue
+
+            if old_contract != new_contract:
+                changed.add(column)
+            continue
+
+        if not values_equal(old_row[column], new_row[column]):
+            changed.add(column)
+
+    return changed
+
+
+def build_row_matches(
+    table1: pd.DataFrame,
+    table2: pd.DataFrame,
+    fio_column: Hashable,
+    direction_column: Hashable,
+    contract_column: Hashable | None,
+    comparison_columns: list[Hashable],
+) -> tuple[dict[int, int], set[int], set[int]]:
+    """
+    Сопоставляет строки старой и новой таблицы.
+
+    Возвращает:
+        new_index -> old_index,
+        индексы несопоставленных старых строк,
+        индексы несопоставленных новых строк.
+    """
+    old_groups: dict[tuple[str, str], list[int]] = defaultdict(list)
+    new_groups: dict[tuple[str, str], list[int]] = defaultdict(list)
+
+    for old_index, row in table1.iterrows():
+        old_groups[make_group_key(row, fio_column, direction_column)].append(old_index)
+
+    for new_index, row in table2.iterrows():
+        new_groups[make_group_key(row, fio_column, direction_column)].append(new_index)
+
+    matches: dict[int, int] = {}
+    unmatched_old: set[int] = set(table1.index)
+    unmatched_new: set[int] = set(table2.index)
+
+    all_group_keys = set(old_groups) | set(new_groups)
+
+    for group_key in all_group_keys:
+        old_indices = old_groups.get(group_key, [])
+        new_indices = new_groups.get(group_key, [])
+
+        if not old_indices or not new_indices:
+            continue
+
+        group_unmatched_old = set(old_indices)
+        group_unmatched_new = set(new_indices)
+
+        def register_match(new_index: int, old_index: int) -> None:
+            matches[new_index] = old_index
+            group_unmatched_new.discard(new_index)
+            group_unmatched_old.discard(old_index)
+            unmatched_new.discard(new_index)
+            unmatched_old.discard(old_index)
+
+        # Шаг 1. Точное совпадение по номеру договора, если он заполнен.
+        if contract_column is not None:
+            old_by_contract: dict[str, list[int]] = defaultdict(list)
+            for old_index in old_indices:
+                contract = normalize_contract(table1.at[old_index, contract_column])
+                if contract:
+                    old_by_contract[contract].append(old_index)
+
+            contract_candidates: list[tuple[int, int, int]] = []
+            for new_index in new_indices:
+                contract = normalize_contract(table2.at[new_index, contract_column])
+                if not contract:
+                    continue
+                for old_index in old_by_contract.get(contract, []):
+                    score = row_difference_score(
+                        table1.loc[old_index],
+                        table2.loc[new_index],
+                        comparison_columns,
+                        fio_column,
+                        direction_column,
+                        contract_column,
+                    )
+                    contract_candidates.append((score, new_index, old_index))
+
+            for _, new_index, old_index in sorted(contract_candidates):
+                if (
+                    new_index in group_unmatched_new
+                    and old_index in group_unmatched_old
+                ):
+                    register_match(new_index, old_index)
+
+        # Шаг 2. Ищем полностью совпадающие по остальным полям строки.
+        exact_candidates: list[tuple[int, int]] = []
+        for new_index in group_unmatched_new:
+            new_row = table2.loc[new_index]
+            for old_index in group_unmatched_old:
+                old_row = table1.loc[old_index]
+                if not contract_compatible(old_row, new_row, contract_column):
+                    continue
+
+                score = row_difference_score(
+                    old_row,
+                    new_row,
+                    comparison_columns,
+                    fio_column,
+                    direction_column,
+                    contract_column,
+                )
+                if score == 0:
+                    exact_candidates.append((new_index, old_index))
+
+        for new_index, old_index in exact_candidates:
+            if new_index in group_unmatched_new and old_index in group_unmatched_old:
+                register_match(new_index, old_index)
+
+        # Шаг 3. Для оставшихся строк выбираем наиболее похожие пары.
+        # Разные заполненные номера договоров сюда вообще не допускаются.
+        similarity_candidates: list[tuple[int, int, int]] = []
+        for new_index in group_unmatched_new:
+            new_row = table2.loc[new_index]
+            for old_index in group_unmatched_old:
+                old_row = table1.loc[old_index]
+                if not contract_compatible(old_row, new_row, contract_column):
+                    continue
+
+                score = row_difference_score(
+                    old_row,
+                    new_row,
+                    comparison_columns,
+                    fio_column,
+                    direction_column,
+                    contract_column,
+                )
+                similarity_candidates.append((score, new_index, old_index))
+
+        for _, new_index, old_index in sorted(similarity_candidates):
+            if new_index in group_unmatched_new and old_index in group_unmatched_old:
+                register_match(new_index, old_index)
+
+    return matches, unmatched_old, unmatched_new
 
 
 def style_row(sheet, row_number: int, column_count: int, fill: PatternFill) -> None:
@@ -194,29 +486,41 @@ def compare_excel_tables(
     file2_path: str | Path,
     output_path: str | Path,
     save_option: str,
-    key_column: Hashable,
+    fio_column: Hashable,
+    direction_column: Hashable,
+    contract_column: Hashable | None = None,
     carry_columns: list[Hashable] | None = None,
 ) -> tuple[Path, list[Hashable], list[Hashable]]:
     """
     Сравнивает первую (старую) и вторую (новую) таблицы.
 
-    Возвращает:
-        путь сохранённого файла,
-        столбцы только первой таблицы,
-        столбцы только второй таблицы.
+    Строки сопоставляются по ФИО + направлению.
+    Номер договора используется как дополнительный признак:
+      - одинаковый заполненный номер имеет приоритет;
+      - разные заполненные номера считаются разными записями;
+      - пустой номер в новой выгрузке не мешает сопоставлению.
+
+    Столбцы, которые есть только в старой таблице, автоматически
+    добавляются в результат и переносятся для сопоставленных строк.
     """
     if save_option not in SAVE_OPTIONS:
         raise ComparisonError(f"Неизвестный режим сохранения: {save_option}")
 
-    table1 = read_excel_table(file1_path)
-    table2 = read_excel_table(file2_path)
+    table1 = read_excel_table(file1_path).reset_index(drop=True)
+    table2 = read_excel_table(file2_path).reset_index(drop=True)
 
     if table1.empty and len(table1.columns) == 0:
         raise ComparisonError("В первой таблице не обнаружены столбцы.")
     if table2.empty and len(table2.columns) == 0:
         raise ComparisonError("Во второй таблице не обнаружены столбцы.")
 
-    validate_key_column(table1, table2, key_column)
+    validate_match_columns(
+        table1,
+        table2,
+        fio_column,
+        direction_column,
+        contract_column,
+    )
 
     columns1 = list(table1.columns)
     columns2 = list(table2.columns)
@@ -247,13 +551,16 @@ def compare_excel_tables(
                 + "\n• ".join(map(str, invalid_columns))
             )
 
-        # Не допускаем повторов, сохраняя выбранный пользователем порядок.
         selected_carry_columns = list(dict.fromkeys(selected_carry_columns))
 
-    table1_by_key = table1.set_index(key_column, drop=False)
-    table2_by_key = table2.set_index(key_column, drop=False)
-    keys1 = set(table1_by_key.index)
-    keys2 = set(table2_by_key.index)
+    matches, unmatched_old, unmatched_new = build_row_matches(
+        table1,
+        table2,
+        fio_column,
+        direction_column,
+        contract_column,
+        common_columns,
+    )
 
     workbook = Workbook()
     sheet = workbook.active
@@ -261,13 +568,15 @@ def compare_excel_tables(
 
     if save_option == SAVE_MISSING:
         output_columns = columns1
-        unused_columns = only_table1
+        carry_for_output: list[Hashable] = []
     elif save_option == SAVE_SUMMARY:
         output_columns = columns2 + selected_carry_columns
-        unused_columns = only_table2
+        carry_for_output = selected_carry_columns
     else:
-        output_columns = columns2
-        unused_columns = only_table2
+        # Главное изменение: все столбцы только из старой таблицы
+        # автоматически добавляются в обычный результат.
+        output_columns = columns2 + only_table1
+        carry_for_output = only_table1
 
     sheet.append([excel_value(column) for column in output_columns])
 
@@ -291,68 +600,54 @@ def compare_excel_tables(
             style_row(sheet, output_row, len(output_columns), FILL_RED)
 
     if save_option == SAVE_MISSING:
-        for _, row in table1.iterrows():
-            if row[key_column] not in keys2:
+        for old_index, row in table1.iterrows():
+            if old_index in unmatched_old:
                 append_row(row, "missing")
     else:
-        for _, row in table2.iterrows():
-            key_value = row[key_column]
+        for new_index, new_row in table2.iterrows():
+            old_index = matches.get(new_index)
 
-            if key_value not in keys1:
+            if old_index is None:
                 if save_option in {
                     SAVE_ALL,
                     SAVE_NEW,
                     SAVE_NEW_CHANGED,
                     SAVE_SUMMARY,
                 }:
-                    if save_option == SAVE_SUMMARY:
-                        summary_row = row.to_dict()
-                        summary_row.update(
-                            {column: None for column in selected_carry_columns}
-                        )
-                        append_row(summary_row, "new")
-                    else:
-                        append_row(row, "new")
+                    result_row = new_row.to_dict()
+                    result_row.update({column: None for column in carry_for_output})
+                    append_row(result_row, "new")
                 continue
 
-            old_row = table1_by_key.loc[key_value]
-            changed_columns = {
-                column
-                for column in common_columns
-                if not values_equal(old_row[column], row[column])
-            }
+            old_row = table1.loc[old_index]
+            changed_columns = changed_columns_for_rows(
+                old_row,
+                new_row,
+                common_columns,
+                fio_column,
+                direction_column,
+                contract_column,
+            )
+
+            result_row = new_row.to_dict()
+            result_row.update(
+                {
+                    column: old_row[column]
+                    for column in carry_for_output
+                }
+            )
 
             if save_option == SAVE_SUMMARY:
-                summary_row = row.to_dict()
-                summary_row.update(
-                    {
-                        column: old_row[column]
-                        for column in selected_carry_columns
-                    }
-                )
                 append_row(
-                    summary_row,
+                    result_row,
                     "changed" if changed_columns else "unchanged",
                     changed_columns,
                 )
             elif changed_columns:
                 if save_option in {SAVE_ALL, SAVE_CHANGED, SAVE_NEW_CHANGED}:
-                    append_row(row, "changed", changed_columns)
+                    append_row(result_row, "changed", changed_columns)
             elif save_option == SAVE_ALL:
-                append_row(row, "unchanged")
-
-    # Столбцы, которых нет в другой таблице, не участвовали в сравнении.
-    for column in unused_columns:
-        column_number = output_columns.index(column) + 1
-        for row_number in range(1, sheet.max_row + 1):
-            sheet.cell(row=row_number, column=column_number).fill = FILL_LIGHT_ORANGE
-
-    # В режиме сводки оранжевым отмечаем только заголовки ручных полей.
-    # Так сохраняется цветовой статус новых и изменённых строк.
-    if save_option == SAVE_SUMMARY:
-        for column in selected_carry_columns:
-            column_number = output_columns.index(column) + 1
-            sheet.cell(row=1, column=column_number).fill = FILL_LIGHT_ORANGE
+                append_row(result_row, "unchanged")
 
     format_sheet(sheet)
 
@@ -380,7 +675,6 @@ def center_window(
         x = parent.winfo_rootx() + (parent.winfo_width() - width) // 2
         y = parent.winfo_rooty() + (parent.winfo_height() - height) // 2
 
-    # Размер остаётся автоматическим: задаём только положение окна.
     window.geometry(f"+{max(0, x)}+{max(0, y)}")
 
 
@@ -396,7 +690,7 @@ def custom_messagebox(title: str, message: str, root: Tk) -> None:
     window = Toplevel(root)
     window.title(title)
 
-    Label(window, text=message, justify="left", wraplength=420).pack(pady=12, padx=12)
+    Label(window, text=message, justify="left", wraplength=500).pack(pady=12, padx=12)
     Button(window, text="Принять", command=window.destroy).pack(pady=5)
 
     window.transient(root)
@@ -456,6 +750,28 @@ def sanitize_filename(filename: str) -> str:
     return f"{filename}.xlsx"
 
 
+def find_suggested_column_index(
+    columns: list[Hashable],
+    exact_names: tuple[str, ...],
+    contains_names: tuple[str, ...] = (),
+) -> int | None:
+    normalized = [normalize_text(column) for column in columns]
+
+    for wanted in exact_names:
+        wanted_norm = normalize_text(wanted)
+        for index, name in enumerate(normalized):
+            if name == wanted_norm:
+                return index
+
+    for wanted in contains_names:
+        wanted_norm = normalize_text(wanted)
+        for index, name in enumerate(normalized):
+            if wanted_norm in name:
+                return index
+
+    return None
+
+
 def select_files(root: Tk) -> None:
     def select_file(entry: Entry) -> None:
         filename = filedialog.askopenfilename(
@@ -498,10 +814,11 @@ def select_files(root: Tk) -> None:
         only_file1_columns = [
             column for column in columns_file1 if column not in columns2_set
         ]
-        if not common_columns:
+
+        if len(common_columns) < 2:
             messagebox.showerror(
                 "Ошибка",
-                "В таблицах нет ни одного общего столбца для выбора ключа.",
+                "В таблицах должно быть минимум два общих столбца: ФИО и направление.",
                 parent=root,
             )
             return
@@ -522,18 +839,76 @@ def select_files(root: Tk) -> None:
 
         Label(
             window,
-            text="Выберите общий уникальный столбец без пустых значений:",
-        ).pack(pady=(12, 6))
+            text=(
+                "Строки будут сопоставляться по ФИО + направлению.\n"
+                "Номер договора используется как дополнительный признак и может быть пустым."
+            ),
+            justify="left",
+            wraplength=520,
+        ).pack(pady=(12, 8), padx=15)
 
-        key_column_combo = ttk.Combobox(
-            window,
+        settings_frame = ttk.LabelFrame(window, text="Столбцы сопоставления", padding=10)
+        settings_frame.pack(fill="x", padx=18, pady=5)
+
+        Label(settings_frame, text="ФИО:").grid(row=0, column=0, sticky=W, padx=5, pady=5)
+        fio_combo = ttk.Combobox(
+            settings_frame,
             width=38,
             values=[str(column) for column in common_columns],
             state="readonly",
         )
-        key_column_combo.pack(pady=10)
-        if common_columns:
-            key_column_combo.current(0)
+        fio_combo.grid(row=0, column=1, padx=5, pady=5)
+
+        Label(settings_frame, text="Направление:").grid(
+            row=1, column=0, sticky=W, padx=5, pady=5
+        )
+        direction_combo = ttk.Combobox(
+            settings_frame,
+            width=38,
+            values=[str(column) for column in common_columns],
+            state="readonly",
+        )
+        direction_combo.grid(row=1, column=1, padx=5, pady=5)
+
+        Label(settings_frame, text="Номер договора:").grid(
+            row=2, column=0, sticky=W, padx=5, pady=5
+        )
+        contract_values = ["— не использовать —"] + [
+            str(column) for column in common_columns
+        ]
+        contract_combo = ttk.Combobox(
+            settings_frame,
+            width=38,
+            values=contract_values,
+            state="readonly",
+        )
+        contract_combo.grid(row=2, column=1, padx=5, pady=5)
+
+        fio_index = find_suggested_column_index(
+            common_columns,
+            ("ФИО", "Ф.И.О.", "ФИО поступающего"),
+            ("фио",),
+        )
+        direction_index = find_suggested_column_index(
+            common_columns,
+            ("Направление", "Направление подготовки", "Специальность"),
+            ("направлен", "специальн"),
+        )
+        contract_index = find_suggested_column_index(
+            common_columns,
+            ("Номер договора", "№ договора", "Договор"),
+            ("номер договора", "№ договора"),
+        )
+
+        fio_combo.current(fio_index if fio_index is not None else 0)
+        direction_combo.current(
+            direction_index
+            if direction_index is not None
+            else (1 if len(common_columns) > 1 else 0)
+        )
+        contract_combo.current(
+            contract_index + 1 if contract_index is not None else 0
+        )
 
         carry_column_vars: list[tuple[Hashable, BooleanVar]] = []
         if save_option == SAVE_SUMMARY:
@@ -541,10 +916,10 @@ def select_files(root: Tk) -> None:
                 window,
                 text=(
                     "Выберите поля из первой таблицы, которые нужно перенести "
-                    "в сводку.\nДля новых строк эти ячейки останутся пустыми."
+                    "в сводку. Для новых строк эти ячейки останутся пустыми."
                 ),
                 justify="left",
-                wraplength=460,
+                wraplength=500,
             ).pack(pady=(14, 6), padx=12)
 
             carry_columns_frame = ttk.LabelFrame(
@@ -562,16 +937,37 @@ def select_files(root: Tk) -> None:
                     variable=selected_var,
                 ).pack(anchor="w", pady=2)
                 carry_column_vars.append((column, selected_var))
+        elif only_file1_columns:
+            Label(
+                window,
+                text=(
+                    "Столбцы только из старой таблицы будут автоматически добавлены "
+                    "в результат и перенесены для найденных строк:\n"
+                    + ", ".join(map(str, only_file1_columns))
+                ),
+                justify="left",
+                wraplength=500,
+            ).pack(pady=(12, 4), padx=18)
 
         def start_comparison() -> None:
-            selected_index = key_column_combo.current()
-            if selected_index < 0:
+            fio_selected_index = fio_combo.current()
+            direction_selected_index = direction_combo.current()
+            contract_selected_index = contract_combo.current()
+
+            if fio_selected_index < 0 or direction_selected_index < 0:
                 messagebox.showerror(
-                    "Ошибка", "Выберите столбец для сравнения.", parent=window
+                    "Ошибка",
+                    "Выберите столбцы ФИО и направления.",
+                    parent=window,
                 )
                 return
 
-            key_column = common_columns[selected_index]
+            fio_column = common_columns[fio_selected_index]
+            direction_column = common_columns[direction_selected_index]
+
+            contract_column: Hashable | None = None
+            if contract_selected_index > 0:
+                contract_column = common_columns[contract_selected_index - 1]
 
             selected_carry_columns: list[Hashable] = []
             if save_option == SAVE_SUMMARY:
@@ -598,7 +994,9 @@ def select_files(root: Tk) -> None:
                     file2_path,
                     output_path,
                     save_option,
-                    key_column,
+                    fio_column,
+                    direction_column,
+                    contract_column,
                     selected_carry_columns,
                 )
             except ComparisonError as exc:
@@ -618,16 +1016,16 @@ def select_files(root: Tk) -> None:
             window.destroy()
 
             if only_table1 or only_table2:
-                details: list[str] = [
-                    "Таблицы имеют разный состав столбцов. Сравнивались только общие столбцы."
-                ]
+                details: list[str] = []
                 if only_table1:
                     details.append(
-                        "Только в первой: " + ", ".join(map(str, only_table1))
+                        "Добавлены из старой таблицы: "
+                        + ", ".join(map(str, only_table1))
                     )
                 if only_table2:
                     details.append(
-                        "Только во второй: " + ", ".join(map(str, only_table2))
+                        "Только в новой таблице (не сравнивались со старой): "
+                        + ", ".join(map(str, only_table2))
                     )
                 custom_messagebox("Обратите внимание", "\n".join(details), root)
 
@@ -774,20 +1172,30 @@ def show_developer_info(root: Tk) -> None:
 
 def show_app_info(root: Tk) -> None:
     info_message = (
+        "Логика сопоставления:\n"
+        "    ФИО + направление — основной ключ\n"
+        "    Номер договора — дополнительный признак\n"
+        "    Пустой номер договора в новой таблице допускается\n"
+        "    Разные заполненные номера договоров считаются разными записями\n\n"
         "Цвета выделения:\n"
         "    Новые строки: жёлтый\n"
         "    Изменённая строка: светло-зелёный\n"
         "    Изменённая ячейка: зелёный\n"
-        "    Строки из первой таблицы, отсутствующие во второй: красный\n"
-        "    Столбцы, не участвовавшие в сравнении: светло-оранжевый\n"
-        "    Заголовки ручных полей сводки: светло-оранжевый"
+        "    Строки из первой таблицы, отсутствующие во второй: красный\n\n"
+        "Столбцы, которые есть только в старой таблице, автоматически "
+        "добавляются в результат для найденных строк."
     )
 
     info_window = Toplevel(root)
     info_window.title("Информация о приложении")
     info_window.transient(root)
 
-    Label(info_window, text=info_message, justify="left").pack(pady=10, padx=10)
+    Label(
+        info_window,
+        text=info_message,
+        justify="left",
+        wraplength=550,
+    ).pack(pady=10, padx=10)
     Button(info_window, text="Закрыть", command=info_window.destroy).pack(pady=10)
     center_after_layout(info_window, root)
 
