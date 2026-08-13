@@ -41,7 +41,6 @@ SAVE_NEW = "Новые строки"
 SAVE_CHANGED = "Измененные строки"
 SAVE_NEW_CHANGED = "Новые/измененные строки"
 SAVE_MISSING = "Потеряшки"
-SAVE_SUMMARY = "Для сводки"
 
 SAVE_OPTIONS = (
     SAVE_ALL,
@@ -49,7 +48,6 @@ SAVE_OPTIONS = (
     SAVE_CHANGED,
     SAVE_NEW_CHANGED,
     SAVE_MISSING,
-    SAVE_SUMMARY,
 )
 
 FILL_YELLOW = PatternFill(start_color="FFEB99", end_color="FFEB99", fill_type="solid")
@@ -495,7 +493,6 @@ def compare_excel_tables(
     fio_column: Hashable,
     direction_column: Hashable,
     contract_column: Hashable | None = None,
-    carry_columns: list[Hashable] | None = None,
     ignored_change_columns: list[Hashable] | None = None,
 ) -> tuple[Path, list[Hashable], list[Hashable]]:
     """
@@ -548,28 +545,6 @@ def compare_excel_tables(
             + "\n• ".join(map(str, invalid_ignored_columns))
         )
 
-    selected_carry_columns = list(carry_columns or [])
-    if save_option == SAVE_SUMMARY:
-        if not selected_carry_columns:
-            raise ComparisonError(
-                "Для режима «Для сводки» выберите хотя бы один столбец "
-                "из первой таблицы."
-            )
-
-        invalid_columns = [
-            column
-            for column in selected_carry_columns
-            if column not in only_table1
-        ]
-        if invalid_columns:
-            raise ComparisonError(
-                "В сводку можно переносить только столбцы, которые есть "
-                "в первой таблице и отсутствуют во второй:\n• "
-                + "\n• ".join(map(str, invalid_columns))
-            )
-
-        selected_carry_columns = list(dict.fromkeys(selected_carry_columns))
-
     matches, unmatched_old, unmatched_new = build_row_matches(
         table1,
         table2,
@@ -586,9 +561,6 @@ def compare_excel_tables(
     if save_option == SAVE_MISSING:
         output_columns = columns1
         carry_for_output: list[Hashable] = []
-    elif save_option == SAVE_SUMMARY:
-        output_columns = columns2 + selected_carry_columns
-        carry_for_output = selected_carry_columns
     else:
         # Главное изменение: все столбцы только из старой таблицы
         # автоматически добавляются в обычный результат.
@@ -629,7 +601,6 @@ def compare_excel_tables(
                     SAVE_ALL,
                     SAVE_NEW,
                     SAVE_NEW_CHANGED,
-                    SAVE_SUMMARY,
                 }:
                     result_row = new_row.to_dict()
                     result_row.update({column: None for column in carry_for_output})
@@ -655,13 +626,7 @@ def compare_excel_tables(
                 }
             )
 
-            if save_option == SAVE_SUMMARY:
-                append_row(
-                    result_row,
-                    "changed" if changed_columns else "unchanged",
-                    changed_columns,
-                )
-            elif changed_columns:
+            if changed_columns:
                 if save_option in {SAVE_ALL, SAVE_CHANGED, SAVE_NEW_CHANGED}:
                     append_row(result_row, "changed", changed_columns)
             elif save_option == SAVE_ALL:
@@ -841,16 +806,6 @@ def select_files(root: Tk) -> None:
             )
             return
 
-        if save_option == SAVE_SUMMARY and not only_file1_columns:
-            messagebox.showerror(
-                "Ошибка",
-                "В первой таблице нет дополнительных столбцов, которых нет "
-                "во второй. Для такого набора файлов используйте режим "
-                "«Все строки».",
-                parent=root,
-            )
-            return
-
         window = Toplevel(root)
         window.title("Настройка сравнения")
         window.transient(root)
@@ -959,34 +914,7 @@ def select_files(root: Tk) -> None:
             )
             ignored_column_vars.append((column, ignored_var))
 
-        carry_column_vars: list[tuple[Hashable, BooleanVar]] = []
-        if save_option == SAVE_SUMMARY:
-            Label(
-                window,
-                text=(
-                    "Выберите поля из первой таблицы, которые нужно перенести "
-                    "в сводку. Для новых строк эти ячейки останутся пустыми."
-                ),
-                justify="left",
-                wraplength=500,
-            ).pack(pady=(14, 6), padx=12)
-
-            carry_columns_frame = ttk.LabelFrame(
-                window,
-                text="Столбцы для переноса",
-                padding=(10, 6),
-            )
-            carry_columns_frame.pack(fill="x", pady=4, padx=18)
-
-            for column in only_file1_columns:
-                selected_var = BooleanVar(value=True)
-                ttk.Checkbutton(
-                    carry_columns_frame,
-                    text=str(column),
-                    variable=selected_var,
-                ).pack(anchor="w", pady=2)
-                carry_column_vars.append((column, selected_var))
-        elif only_file1_columns:
+        if only_file1_columns:
             Label(
                 window,
                 text=(
@@ -1024,21 +952,6 @@ def select_files(root: Tk) -> None:
                 if ignored_var.get()
             ]
 
-            selected_carry_columns: list[Hashable] = []
-            if save_option == SAVE_SUMMARY:
-                selected_carry_columns = [
-                    column
-                    for column, selected_var in carry_column_vars
-                    if selected_var.get()
-                ]
-                if not selected_carry_columns:
-                    messagebox.showerror(
-                        "Ошибка",
-                        "Поставьте галочку хотя бы у одного столбца для переноса в сводку.",
-                        parent=window,
-                    )
-                    return
-
             root.config(cursor="watch")
             window.config(cursor="watch")
             root.update_idletasks()
@@ -1052,7 +965,6 @@ def select_files(root: Tk) -> None:
                     fio_column,
                     direction_column,
                     contract_column,
-                    selected_carry_columns,
                     ignored_change_columns,
                 )
             except ComparisonError as exc:
@@ -1070,20 +982,6 @@ def select_files(root: Tk) -> None:
                 window.config(cursor="")
 
             window.destroy()
-
-            if only_table1 or only_table2:
-                details: list[str] = []
-                if only_table1:
-                    details.append(
-                        "Добавлены из старой таблицы: "
-                        + ", ".join(map(str, only_table1))
-                    )
-                if only_table2:
-                    details.append(
-                        "Только в новой таблице (не сравнивались со старой): "
-                        + ", ".join(map(str, only_table2))
-                    )
-                custom_messagebox("Обратите внимание", "\n".join(details), root)
 
             show_success_window(saved_path, root)
 
@@ -1151,8 +1049,6 @@ def select_files(root: Tk) -> None:
     for row_number, option in enumerate(SAVE_OPTIONS, start=4):
         if option == SAVE_MISSING:
             label = "Потеряшки"
-        elif option == SAVE_SUMMARY:
-            label = "Для сводки (все + комментарии)"
         else:
             label = option.replace("Новые/измененные", "Новые + изменённые")
         Radiobutton(
