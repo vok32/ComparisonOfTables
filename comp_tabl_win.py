@@ -689,7 +689,7 @@ def show_success_window(output_path: Path, root: Tk) -> None:
 
     Label(
         success_window,
-        text=f"Результаты сравнения сохранены в файл:\n{output_path}",
+        text=f"Результаты сравнения сохранены в файл:\n{display_path(output_path)}",
         wraplength=470,
     ).pack(pady=10, padx=10)
 
@@ -721,6 +721,11 @@ def default_output_path() -> Path:
     comparison_folder = base_folder / "Сравнение таблиц"
     comparison_folder.mkdir(parents=True, exist_ok=True)
     return comparison_folder / DEFAULT_OUTPUT_NAME
+
+
+def display_path(path: str | Path) -> str:
+    """Показывает путь с обычными слешами, не меняя работу с файлами."""
+    return str(path).replace("\\", "/")
 
 
 def sanitize_filename(filename: str) -> str:
@@ -762,13 +767,15 @@ def select_files(root: Tk) -> None:
         )
         if filename:
             entry.delete(0, END)
-            entry.insert(0, filename)
+            entry.insert(0, display_path(filename))
 
     def select_output_folder() -> None:
         foldername = filedialog.askdirectory()
         if foldername:
             output_entry.delete(0, END)
-            output_entry.insert(0, str(Path(foldername) / DEFAULT_OUTPUT_NAME))
+            output_entry.insert(
+                0, display_path(Path(foldername) / DEFAULT_OUTPUT_NAME)
+            )
 
     def load_columns(file_path: str) -> list[Hashable] | None:
         try:
@@ -1015,9 +1022,11 @@ def select_files(root: Tk) -> None:
     output_entry = Entry(frame, width=50)
     output_entry.grid(row=2, column=1, padx=5, pady=5)
     try:
-        output_entry.insert(0, str(default_output_path()))
+        output_entry.insert(0, display_path(default_output_path()))
     except OSError:
-        output_entry.insert(0, str(Path.home() / DEFAULT_OUTPUT_NAME))
+        output_entry.insert(
+            0, display_path(Path.home() / DEFAULT_OUTPUT_NAME)
+        )
 
     Button(frame, text="Выбрать папку", command=select_output_folder).grid(
         row=2, column=2, padx=5, pady=5
@@ -1037,7 +1046,7 @@ def select_files(root: Tk) -> None:
 
         folder_path = Path(output_entry.get()).parent
         output_entry.delete(0, END)
-        output_entry.insert(0, str(folder_path / safe_filename))
+        output_entry.insert(0, display_path(folder_path / safe_filename))
 
     Button(frame, text="Изменить имя файла", command=update_filename).grid(
         row=3, column=2, padx=5, pady=5
