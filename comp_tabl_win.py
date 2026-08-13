@@ -225,9 +225,11 @@ def validate_match_columns(
             )
 
     if problems:
+        problems_text = "\n• ".join(problems)
+
         raise ComparisonError(
             "Для надёжного сопоставления ФИО и направление должны быть заполнены:\n• "
-            + "\n• ".join(problems)
+            f"{problems_text}"
         )
 
 
@@ -410,10 +412,10 @@ def build_row_matches(
                     contract_candidates.append((score, new_index, old_index))
 
             for _, new_index, old_index in sorted(contract_candidates):
-                if (
-                    new_index in group_unmatched_new
-                    and old_index in group_unmatched_old
-                ):
+                new_is_unmatched = new_index in group_unmatched_new
+                old_is_unmatched = old_index in group_unmatched_old
+
+                if new_is_unmatched and old_is_unmatched:
                     register_match(new_index, old_index)
 
         # Шаг 2. Ищем полностью совпадающие по остальным полям строки.
@@ -540,9 +542,11 @@ def compare_excel_tables(
         column for column in ignored_changes if column not in common_columns
     ]
     if invalid_ignored_columns:
+        columns_text = "\n• ".join(map(str, invalid_ignored_columns))
+
         raise ComparisonError(
             "Исключить из проверки изменений можно только общие столбцы двух таблиц:\n• "
-            + "\n• ".join(map(str, invalid_ignored_columns))
+            f"{columns_text}"
         )
 
     matches, unmatched_old, unmatched_new = build_row_matches(
@@ -874,11 +878,6 @@ def select_files(root: Tk) -> None:
             ("Конкурсная группа", "Направление", "Направление подготовки", "Специальность"),
             ("конкурсн", "направлен", "специальн"),
         )
-        contract_index = find_suggested_column_index(
-            common_columns,
-            ("Номер договора", "№ договора", "Договор"),
-            ("номер договора", "№ договора"),
-        )
 
         fio_combo.current(fio_index if fio_index is not None else 0)
         direction_combo.current(
@@ -922,12 +921,14 @@ def select_files(root: Tk) -> None:
             ignored_column_vars.append((column, ignored_var))
 
         if only_file1_columns:
+            columns_text = ", ".join(map(str, only_file1_columns))
+
             Label(
                 window,
                 text=(
                     "Столбцы только из старой таблицы будут автоматически добавлены "
                     "в результат и перенесены для найденных строк:\n"
-                    + ", ".join(map(str, only_file1_columns))
+                    f"{columns_text}"
                 ),
                 justify="left",
                 wraplength=500,
