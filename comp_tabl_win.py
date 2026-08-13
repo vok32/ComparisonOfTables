@@ -51,7 +51,9 @@ SAVE_OPTIONS = (
 )
 
 FILL_YELLOW = PatternFill(start_color="FFEB99", end_color="FFEB99", fill_type="solid")
-FILL_LIGHT_GREEN = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
+FILL_LIGHT_GREEN = PatternFill(
+    start_color="CCFFCC", end_color="CCFFCC", fill_type="solid"
+)
 FILL_GREEN = PatternFill(start_color="77DD77", end_color="77DD77", fill_type="solid")
 FILL_RED = PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid")
 
@@ -118,11 +120,14 @@ def is_missing(value: Any) -> bool:
 
 
 def values_equal(left: Any, right: Any) -> bool:
-    """Считает две пустые ячейки равными."""
+    """Сравнивает значения, не учитывая регистр текстовых данных."""
     left_missing = is_missing(left)
     right_missing = is_missing(right)
     if left_missing or right_missing:
         return left_missing and right_missing
+
+    if isinstance(left, str) and isinstance(right, str):
+        return left.casefold() == right.casefold()
 
     try:
         result = left == right
@@ -202,9 +207,12 @@ def validate_match_columns(
         raise ComparisonError("Для ФИО и направления нужно выбрать разные столбцы.")
 
     if contract_column is not None:
-        if contract_column not in table1.columns or contract_column not in table2.columns:
+        contract_in_table1 = contract_column in table1.columns
+        contract_in_table2 = contract_column in table2.columns
+        if not contract_in_table1 or not contract_in_table2:
             raise ComparisonError(
-                "Выбранный столбец номера договора должен присутствовать в обеих таблицах."
+                "Выбранный столбец номера договора должен присутствовать "
+                "в обеих таблицах."
             )
         if contract_column in {fio_column, direction_column}:
             raise ComparisonError(
@@ -213,7 +221,9 @@ def validate_match_columns(
 
     problems: list[str] = []
     for number, table in ((1, table1), (2, table2)):
-        fio_empty = int(table[fio_column].apply(lambda x: normalize_text(x) == "").sum())
+        fio_empty = int(
+            table[fio_column].apply(lambda x: normalize_text(x) == "").sum()
+        )
         direction_empty = int(
             table[direction_column].apply(lambda x: normalize_text(x) == "").sum()
         )
@@ -283,7 +293,8 @@ def row_difference_score(
             old_contract = normalize_contract(old_row[column])
             new_contract = normalize_contract(new_row[column])
 
-            # Пустой номер в новой выгрузке не считаем различием: он мог ещё не подгрузиться.
+            # Пустой номер в новой выгрузке не считаем различием:
+            # он мог ещё не подгрузиться.
             if not new_contract and old_contract:
                 continue
 
@@ -545,7 +556,8 @@ def compare_excel_tables(
         columns_text = "\n• ".join(map(str, invalid_ignored_columns))
 
         raise ComparisonError(
-            "Исключить из проверки изменений можно только общие столбцы двух таблиц:\n• "
+            "Исключить из проверки изменений можно только общие "
+            "столбцы двух таблиц:\n• "
             f"{columns_text}"
         )
 
@@ -671,20 +683,6 @@ def center_after_layout(
 ) -> None:
     """Центрирует окно после расчёта размеров всех элементов интерфейса."""
     window.after_idle(lambda: center_window(window, parent))
-
-
-def custom_messagebox(title: str, message: str, root: Tk) -> None:
-    window = Toplevel(root)
-    window.title(title)
-
-    Label(window, text=message, justify="left", wraplength=500).pack(pady=12, padx=12)
-    Button(window, text="Принять", command=window.destroy).pack(pady=5)
-
-    window.transient(root)
-    center_after_layout(window, root)
-    window.grab_set()
-    window.focus_set()
-    window.wait_window()
 
 
 def show_success_window(output_path: Path, root: Tk) -> None:
@@ -825,16 +823,21 @@ def select_files(root: Tk) -> None:
             window,
             text=(
                 "Строки будут сопоставляться по ФИО + направлению.\n"
-                "Номер договора используется как дополнительный признак и может быть пустым."
+                "Номер договора используется как дополнительный признак "
+                "и может быть пустым."
             ),
             justify="left",
             wraplength=520,
         ).pack(pady=(12, 8), padx=15)
 
-        settings_frame = ttk.LabelFrame(window, text="Столбцы сопоставления", padding=10)
+        settings_frame = ttk.LabelFrame(
+            window, text="Столбцы сопоставления", padding=10
+        )
         settings_frame.pack(fill="x", padx=18, pady=5)
 
-        Label(settings_frame, text="ФИО:").grid(row=0, column=0, sticky=W, padx=5, pady=5)
+        Label(settings_frame, text="ФИО:").grid(
+            row=0, column=0, sticky=W, padx=5, pady=5
+        )
         fio_combo = ttk.Combobox(
             settings_frame,
             width=38,
@@ -875,7 +878,12 @@ def select_files(root: Tk) -> None:
         )
         direction_index = find_suggested_column_index(
             common_columns,
-            ("Конкурсная группа", "Направление", "Направление подготовки", "Специальность"),
+            (
+                "Конкурсная группа",
+                "Направление",
+                "Направление подготовки",
+                "Специальность",
+            ),
             ("конкурсн", "направлен", "специальн"),
         )
 
@@ -891,7 +899,8 @@ def select_files(root: Tk) -> None:
             window,
             text=(
                 "При необходимости отметьте столбцы, изменения в которых не нужно "
-                "подсвечивать. Значения в результате всё равно будут взяты из новой таблицы."
+                "подсвечивать. Значения в результате всё равно будут взяты "
+                "из новой таблицы."
             ),
             justify="left",
             wraplength=520,
@@ -965,7 +974,7 @@ def select_files(root: Tk) -> None:
             root.update_idletasks()
 
             try:
-                saved_path, only_table1, only_table2 = compare_excel_tables(
+                saved_path, _, _ = compare_excel_tables(
                     file1_path,
                     file2_path,
                     output_path,
